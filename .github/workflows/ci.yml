@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Swift
+      uses: swift-actions/setup-swift@v2
+      with:
+        swift-version: "5.9"
+
+    - name: Display Swift version
+      run: swift --version
+
+    - name: Build
+      run: swift build -v
+
+    - name: Run tests
+      run: swift test -v
+
+    - name: Build release
+      run: swift build -c release
+
+    - name: Verify executable
+      run: |
+        .build/release/secret-wallet --version
+        echo "Build successful!"
+
+  lint:
+    name: Swift Lint
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install SwiftLint
+      run: brew install swiftlint
+
+    - name: Run SwiftLint
+      run: swiftlint lint --strict
+      continue-on-error: true  # Don't fail build initially
+
+  security:
+    name: Security Audit
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for hardcoded secrets
+      run: |
+        echo "Scanning for potential hardcoded secrets..."
+        if grep -r "sk-proj-" Sources/ 2>/dev/null; then
+          echo "ERROR: Found potential API key pattern"
+          exit 1
+        fi
+        if grep -r "sk-ant-" Sources/ 2>/dev/null; then
+          echo "ERROR: Found potential Anthropic API key"
+          exit 1
+        fi
+        echo "No hardcoded secrets detected"
+
+    - name: Dependency audit
+      run: |
+        echo "Checking Swift package dependencies..."
+        swift package show-dependencies

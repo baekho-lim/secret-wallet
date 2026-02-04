@@ -27,7 +27,15 @@ jobs:
       run: swift build -v
 
     - name: Run tests
-      run: swift test -v
+      run: |
+        if swift package describe | grep -q "testTarget"; then
+          swift test -v
+        else
+          echo "⚠️  No test targets defined yet"
+          echo "Running manual integration test instead..."
+          chmod +x ./scripts/manual-test.sh
+          ./scripts/manual-test.sh
+        fi
 
     - name: Build release
       run: swift build -c release

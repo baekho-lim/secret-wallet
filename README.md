@@ -133,7 +133,7 @@ secret-wallet init
 ```
 🔐 Secret Wallet 초기화 중...
 ✅ macOS Keychain 연동 완료
-✅ TouchID 사용 가능 (비밀 추가 시 활성화)
+✅ TouchID/FaceID 사용 가능 (비밀 추가 시 활성화)
 ```
 
 ### 2. Add Secrets
@@ -146,8 +146,8 @@ secret-wallet add OPENAI_API_KEY
 
 #### High-Security Secret (Biometric Required)
 ```bash
-secret-wallet add ANTHROPIC_API_KEY --biometric --env-var ANTHROPIC_API_KEY
-# TouchID prompt appears
+secret-wallet add ANTHROPIC_API_KEY --biometric --env-name ANTHROPIC_API_KEY
+# TouchID/FaceID prompt appears on access
 ```
 
 ### 3. List Secrets
@@ -158,9 +158,10 @@ secret-wallet list
 
 **Output:**
 ```
-저장된 비밀 (2개):
-- OPENAI_API_KEY
-- ANTHROPIC_API_KEY (🔐 TouchID)
+저장된 비밀 목록:
+
+  🔓 OPENAI_API_KEY → $OPENAI_API_KEY
+  🔐 ANTHROPIC_API_KEY → $ANTHROPIC_API_KEY
 ```
 
 ### 4. Inject and Run
@@ -194,18 +195,18 @@ Verifies read/write access to macOS Keychain.
 #### `add` - Store a Secret
 
 ```bash
-secret-wallet add <name> [--biometric] [--env-var <VAR_NAME>]
+secret-wallet add <name> [--biometric] [--env-name <VAR_NAME>]
 ```
 
 **Arguments:**
 - `<name>`: Unique identifier for the secret
 - `--biometric`: Require TouchID/FaceID for retrieval
-- `--env-var <VAR_NAME>`: Environment variable name for `inject` command
+- `--env-name <VAR_NAME>`: Environment variable name for `inject` command
 
 **Example:**
 ```bash
 # Add OpenAI API key with biometric protection
-secret-wallet add openai-key --biometric --env-var OPENAI_API_KEY
+secret-wallet add openai-key --biometric --env-name OPENAI_API_KEY
 
 # Paste key when prompted:
 # sk-proj-xxxxxxxxxxxxxxxx
@@ -222,7 +223,7 @@ secret-wallet get <name>
 **Example:**
 ```bash
 secret-wallet get openai-key
-# TouchID prompt appears (if biometric was enabled)
+# TouchID/FaceID prompt appears (if biometric was enabled)
 # Output: sk-proj-xxxxxxxxxxxxxxxx
 ```
 
@@ -236,10 +237,11 @@ secret-wallet list
 
 **Output:**
 ```
-저장된 비밀 (3개):
-- openai-key (🔐 TouchID) → OPENAI_API_KEY
-- anthropic-key (🔐 TouchID) → ANTHROPIC_API_KEY
-- github-token → GITHUB_TOKEN
+저장된 비밀 목록:
+
+  🔐 openai-key → $OPENAI_API_KEY
+  🔐 anthropic-key → $ANTHROPIC_API_KEY
+  🔓 github-token → $GITHUB_TOKEN
 ```
 
 ---
@@ -253,8 +255,8 @@ secret-wallet remove <name>
 **Example:**
 ```bash
 secret-wallet remove openai-key
-# TouchID prompt appears (if biometric was enabled)
-# Output: ✅ 비밀 삭제 완료: openai-key
+# TouchID/FaceID prompt appears (if biometric was enabled)
+# Output: ✅ 'openai-key' 삭제됨
 ```
 
 ---
@@ -266,7 +268,7 @@ secret-wallet inject -- <command> [args...]
 ```
 
 **How it works:**
-1. Reads metadata from `~/.secret-wallet/metadata.json`
+1. Reads metadata from `~/Library/Application Support/secret-wallet/metadata.json`
 2. Retrieves all secrets from Keychain (with biometric auth if needed)
 3. Sets environment variables in child process
 4. Executes `<command>` with injected variables
@@ -335,33 +337,31 @@ secret-wallet/
 │   └── secret-wallet/
 │       └── main.swift          # 410 lines
 ├── Package.swift               # Swift Package Manager config
-└── ~/.secret-wallet/
-    └── metadata.json           # Secret names + env var mapping
+└── ~/Library/Application Support/
+    └── secret-wallet/
+        └── metadata.json       # Secret names + env var mapping
 ```
 
 ### Metadata Schema
 
 ```json
-{
-  "version": 1,
-  "secrets": {
-    "openai-key": {
-      "envVar": "OPENAI_API_KEY",
-      "biometric": true,
-      "createdAt": "2024-01-31T10:00:00Z"
-    }
+[
+  {
+    "name": "openai-key",
+    "envName": "OPENAI_API_KEY",
+    "biometric": true
   }
-}
+]
 ```
 
 ### Keychain Storage
 
-| Key | Value | Access Control |
-|-----|-------|----------------|
-| `secret-wallet:openai-key` | `sk-proj-xxx...` | Biometric (if enabled) |
-| `secret-wallet:github-token` | `ghp_xxx...` | Password only |
+| Service | Account | Value | Access Control |
+|---------|---------|-------|----------------|
+| `com.secret-wallet` | `openai-key` | `sk-proj-xxx...` | Biometric (if enabled) |
+| `com.secret-wallet` | `github-token` | `ghp_xxx...` | Password only |
 
-**Service Name**: `secret-wallet`
+**Service Name**: `com.secret-wallet`
 **Account**: Secret name (e.g., `openai-key`)
 
 ---
@@ -386,7 +386,7 @@ secret-wallet/
 **After (Secure):**
 ```bash
 # Store credential securely
-secret-wallet add anthropic-key --biometric --env-var ANTHROPIC_API_KEY
+secret-wallet add anthropic-key --biometric --env-name ANTHROPIC_API_KEY
 
 # Run Moltbot with injected credential
 secret-wallet inject -- moltbot chat "Hello world"
@@ -404,9 +404,9 @@ const apiKey = process.env.ANTHROPIC_API_KEY || readFromAuthProfiles()
 
 ```bash
 # Store multiple API keys
-secret-wallet add openai --biometric --env-var OPENAI_API_KEY
-secret-wallet add anthropic --biometric --env-var ANTHROPIC_API_KEY
-secret-wallet add deepseek --biometric --env-var DEEPSEEK_API_KEY
+secret-wallet add openai --biometric --env-name OPENAI_API_KEY
+secret-wallet add anthropic --biometric --env-name ANTHROPIC_API_KEY
+secret-wallet add deepseek --biometric --env-name DEEPSEEK_API_KEY
 
 # Run agent with all credentials injected
 secret-wallet inject -- ./multi-agent-orchestrator.sh
@@ -418,11 +418,11 @@ secret-wallet inject -- ./multi-agent-orchestrator.sh
 
 ```bash
 # Development
-secret-wallet add github-token --env-var GITHUB_TOKEN
+secret-wallet add github-token --env-name GITHUB_TOKEN
 secret-wallet inject -- gh pr create --title "Feature X"
 
 # Deployment
-secret-wallet add vercel-token --env-var VERCEL_TOKEN
+secret-wallet add vercel-token --env-name VERCEL_TOKEN
 secret-wallet inject -- vercel deploy --prod
 ```
 
@@ -536,7 +536,7 @@ Secret Wallet ensures credentials only exist in the target process memory.
 
 ```bash
 # 1. Store secret securely
-secret-wallet add my-api-key --biometric --env-var API_KEY
+secret-wallet add my-api-key --biometric --env-name API_KEY
 
 # 2. Remove from plaintext config
 sed -i '' '/apiKey/d' config.json

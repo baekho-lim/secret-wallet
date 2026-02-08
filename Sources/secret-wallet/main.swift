@@ -36,7 +36,14 @@ struct Init: ParsableCommand {
 
             if retrieved == testValue {
                 print("✅ macOS Keychain 연동 완료")
-                print("✅ TouchID 사용 가능 (비밀 추가 시 활성화)")
+                let context = LAContext()
+                var authError: NSError?
+                if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) {
+                    print("✅ TouchID/FaceID 사용 가능 (비밀 추가 시 활성화)")
+                } else {
+                    let reason = authError?.localizedDescription ?? "알 수 없음"
+                    print("⚠️ TouchID/FaceID 사용 불가: \(reason)")
+                }
                 print("")
                 print("사용법:")
                 print("  secret-wallet add <name>        # 비밀 추가")
@@ -84,12 +91,17 @@ struct Add: ParsableCommand {
         }
 
         do {
-            // Store metadata (env var name mapping)
-            let metadata = SecretMetadata(name: name, envName: envVar, biometric: biometric)
-            try MetadataStore.save(metadata)
-
             // Store actual secret in Keychain
             try KeychainManager.save(key: name, value: secret, biometric: biometric)
+
+            // Store metadata (env var name mapping)
+            let metadata = SecretMetadata(name: name, envName: envVar, biometric: biometric)
+            do {
+                try MetadataStore.save(metadata)
+            } catch {
+                try? KeychainManager.delete(key: name)
+                throw error
+            }
 
             print("✅ Keychain에 저장됨 (파일 없음)")
             if biometric {
@@ -102,12 +114,20 @@ struct Add: ParsableCommand {
     }
 
     private func readSecretFromStdin() -> String {
+        if isatty(STDIN_FILENO) == 0 {
+            return readLine(strippingNewline: true) ?? ""
+        }
+
         // Disable echo for password input
         var oldTermios = termios()
-        tcgetattr(STDIN_FILENO, &oldTermios)
+        guard tcgetattr(STDIN_FILENO, &oldTermios) == 0 else {
+            return readLine(strippingNewline: true) ?? ""
+        }
         var newTermios = oldTermios
         newTermios.c_lflag &= ~UInt(ECHO)
-        tcsetattr(STDIN_FILENO, TCSANOW, &newTermios)
+        guard tcsetattr(STDIN_FILENO, TCSANOW, &newTermios) == 0 else {
+            return readLine(strippingNewline: true) ?? ""
+        }
 
         defer {
             // Restore terminal settings
@@ -131,7 +151,10 @@ struct Get: ParsableCommand {
 
     func run() throws {
         do {
-            let value = try KeychainManager.get(key: name)
+            let value = try KeychainManager.get(
+                key: name,
+                prompt: "secret-wallet에서 '\(name)' 비밀을 사용하려면 인증이 필요합니다."
+            )
             // Output only the value (for piping)
             print(value, terminator: "")
         } catch {
@@ -178,7 +201,10 @@ struct Remove: ParsableCommand {
 
     func run() throws {
         do {
-            try KeychainManager.delete(key: name)
+            try KeychainManager.delete(
+                key: name,
+                prompt: "secret-wallet에서 '\(name)' 비밀을 삭제하려면 인증이 필요합니다."
+            )
             try MetadataStore.delete(name: name)
             print("✅ '\(name)' 삭제됨")
         } catch {
@@ -215,9 +241,16 @@ struct Inject: ParsableCommand {
         var env = ProcessInfo.processInfo.environment
         var injectedCount = 0
 
+        let authContext = LAContext()
+        authContext.touchIDAuthenticationAllowableReuseDuration = 10
+
         for secret in secrets {
             do {
-                let value = try KeychainManager.get(key: secret.name)
+                let value = try KeychainManager.get(
+                    key: secret.name,
+                    prompt: "secret-wallet에서 '\(secret.name)' 비밀을 사용하려면 인증이 필요합니다.",
+                    context: authContext
+                )
                 env[secret.envName] = value
                 injectedCount += 1
             } catch {
@@ -299,7 +332,7 @@ enum KeychainManager {
         }
     }
 
-    static func get(key: String) throws -> String {
+    static func get(key: String, prompt: String? = nil, context: LAContext? = nil) throws -> String {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -308,8 +341,16 @@ enum KeychainManager {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
+        var authQuery = query
+        if let context {
+            authQuery[kSecUseAuthenticationContext as String] = context
+        }
+        if let prompt {
+            authQuery[kSecUseOperationPrompt as String] = prompt
+        }
+
         var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let status = SecItemCopyMatching(authQuery as CFDictionary, &result)
 
         guard status == errSecSuccess,
               let data = result as? Data,
@@ -323,12 +364,19 @@ enum KeychainManager {
         return value
     }
 
-    static func delete(key: String) throws {
-        let query: [String: Any] = [
+    static func delete(key: String, prompt: String? = nil, context: LAContext? = nil) throws {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
         ]
+
+        if let context {
+            query[kSecUseAuthenticationContext as String] = context
+        }
+        if let prompt {
+            query[kSecUseOperationPrompt as String] = prompt
+        }
 
         let status = SecItemDelete(query as CFDictionary)
 
@@ -380,6 +428,7 @@ enum MetadataStore {
 
         let data = try JSONEncoder().encode(all)
         try data.write(to: metadataURL, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: metadataURL.path)
     }
 }
 

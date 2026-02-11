@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Display Swift version
+      run: swift --version
+
+    - name: Build release binary
+      run: swift build -c release
+
+    - name: Run integration tests
+      run: |
+        chmod +x ./scripts/manual-test.sh
+        ./scripts/manual-test.sh
+
+    - name: Verify version matches tag
+      run: |
+        BINARY_VERSION=$(.build/release/secret-wallet --version)
+        TAG_VERSION=${GITHUB_REF_NAME#v}
+        if [ "$BINARY_VERSION" != "$TAG_VERSION" ]; then
+          echo "Version mismatch: binary=$BINARY_VERSION tag=$TAG_VERSION"
+          exit 1
+        fi
+        echo "Version verified: $BINARY_VERSION"
+
+    - name: Create archive
+      run: |
+        tar czf secret-wallet-arm64-darwin.tar.gz \
+          -C .build/release secret-wallet
+
+    - name: Generate SHA256
+      run: |
+        shasum -a 256 secret-wallet-arm64-darwin.tar.gz | tee sha256.txt
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          secret-wallet-arm64-darwin.tar.gz
+          sha256.txt
+        generate_release_notes: true
+        body: |
+          ## Install
+
+          ### Homebrew (recommended)
+          ```bash
+          brew tap baekho-lim/tap
+          brew install secret-wallet
+          ```
+
+          ### Manual
+          ```bash
+          curl -L https://github.com/baekho-lim/secret-wallet/releases/download/${{ github.ref_name }}/secret-wallet-arm64-darwin.tar.gz | tar xz
+          sudo mv secret-wallet /usr/local/bin/
+          ```

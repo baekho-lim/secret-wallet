@@ -7,6 +7,8 @@ struct KeyCardView: View {
 
     @State private var showDeleteConfirm = false
     @State private var copied = false
+    @State private var isHoveringCopy = false
+    @State private var isHoveringDelete = false
 
     private var serviceIcon: String {
         if let service = AIService.all.first(where: { $0.id == metadata.serviceName }) {
@@ -63,10 +65,13 @@ struct KeyCardView: View {
                     Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         .font(.body)
                         .frame(width: 32, height: 32)
+                        .background(isHoveringCopy ? Color.secondary.opacity(0.1) : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(copied ? .green : .secondary)
+                .foregroundStyle(copied ? .green : isHoveringCopy ? .primary : .secondary)
+                .onHover { isHoveringCopy = $0 }
                 .help("Copy key to clipboard")
 
                 Button {
@@ -75,10 +80,13 @@ struct KeyCardView: View {
                     Image(systemName: "trash")
                         .font(.body)
                         .frame(width: 32, height: 32)
+                        .background(isHoveringDelete ? Color.red.opacity(0.1) : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isHoveringDelete ? .red : .secondary)
+                .onHover { isHoveringDelete = $0 }
                 .help("Delete key")
             }
         }

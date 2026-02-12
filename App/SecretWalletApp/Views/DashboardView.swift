@@ -36,6 +36,9 @@ struct DashboardView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { loadSecrets() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loadSecrets()
+        }
         .sheet(isPresented: $showAddSheet) {
             AddKeyView { loadSecrets() }
         }

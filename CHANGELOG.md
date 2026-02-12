@@ -16,8 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Key cards with copy-to-clipboard and delete actions
   - TouchID/FaceID toggle per key
   - Error dialogs for failed operations (no silent failures)
+  - Save success animation (checkmark overlay + auto-dismiss)
+  - Auto-refresh dashboard when app gains focus (reflects CLI changes)
+  - Hover feedback on copy/delete action buttons
 - AI service presets with icons and default env var names
 - Shared storage between CLI and GUI (same Keychain service + metadata file)
+- AppDelegate for window activation and Dock click handling
+
+### Fixed
+- Biometric ACL `errSecMissingEntitlement` (-34018) on unsigned apps -- two-stage fallback to non-biometric
+- Delete-before-save uses direct `SecItemDelete` without LAContext (avoids biometric prompt on overwrite)
+- Error message positioned above Save button (was hidden inside ScrollView)
+- Biometric toggle defaults to `BiometricService.isAvailable` (was always `true`)
+- CLI `KeychainManager.save()` aligned with GUI: same fallback pattern, returns `Bool` for actual biometric status
 
 ### Security
 - Clipboard auto-clear after 30 seconds (using changeCount, not secret comparison)

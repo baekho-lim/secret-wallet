@@ -5,8 +5,16 @@ import LocalAuthentication
 enum KeychainManager {
     private static let service = "com.secret-wallet"
 
-    static func save(key: String, value: String, biometric: Bool = false) throws {
-        try? delete(key: key)
+    /// Returns `true` if biometric was actually applied, `false` if it fell back to non-biometric.
+    @discardableResult
+    static func save(key: String, value: String, biometric: Bool = false) throws -> Bool {
+        // Delete without LAContext to avoid biometric prompt on overwrite
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
 
         guard let data = value.data(using: .utf8) else {
             throw SecretWalletError.encodingFailed
@@ -19,26 +27,42 @@ enum KeychainManager {
             kSecValueData as String: data,
         ]
 
+        var biometricApplied = false
+
         if biometric {
             var error: Unmanaged<CFError>?
-            guard let access = SecAccessControlCreateWithFlags(
+            if let access = SecAccessControlCreateWithFlags(
                 nil,
                 kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
                 .biometryCurrentSet,
                 &error
-            ) else {
-                throw SecretWalletError.accessControlFailed
+            ) {
+                query[kSecAttrAccessControl as String] = access
+                biometricApplied = true
+            } else {
+                // Fallback to non-biometric if ACL creation fails
+                query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             }
-            query[kSecAttrAccessControl as String] = access
         } else {
             query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         }
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
+
+        // -34018 (errSecMissingEntitlement): unsigned app can't use biometric ACL
+        // Retry without biometric protection
+        if status == errSecMissingEntitlement && biometricApplied {
+            query.removeValue(forKey: kSecAttrAccessControl as String)
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            biometricApplied = false
+            status = SecItemAdd(query as CFDictionary, nil)
+        }
 
         guard status == errSecSuccess else {
             throw SecretWalletError.keychainError(status)
         }
+
+        return biometricApplied
     }
 
     static func get(key: String, prompt: String? = nil, context: LAContext? = nil) throws -> String {

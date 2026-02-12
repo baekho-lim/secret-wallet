@@ -1,12 +1,14 @@
 import Foundation
+import os.log
+
+private let metaLogger = Logger(subsystem: "com.secret-wallet", category: "MetadataStore")
 
 enum MetadataStore {
     private static let queue = DispatchQueue(label: "com.secret-wallet.metadata")
 
     private static var metadataURL: URL {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            fatalError("Application Support directory not available")
-        }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("secret-wallet")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("metadata.json")
@@ -34,12 +36,18 @@ enum MetadataStore {
     }
 
     private static func readAll() -> [SecretMetadata] {
-        guard let data = try? Data(contentsOf: metadataURL) else {
+        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
             return []
         }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode([SecretMetadata].self, from: data)) ?? []
+        do {
+            let data = try Data(contentsOf: metadataURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode([SecretMetadata].self, from: data)
+        } catch {
+            metaLogger.error("Metadata corrupted: \(error.localizedDescription) -- returning empty list")
+            return []
+        }
     }
 
     private static func writeAll(_ items: [SecretMetadata]) throws {

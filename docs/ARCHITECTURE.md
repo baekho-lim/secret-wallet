@@ -69,7 +69,9 @@ Key decisions:
 - `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` prevents iCloud Keychain sync
 - `.biometryCurrentSet` invalidates access when biometrics change (e.g., new fingerprint added)
 - `LAContext.localizedReason` used instead of deprecated `kSecUseOperationPrompt`
-- Delete-before-save pattern to handle Keychain update semantics
+- Delete-before-save pattern to handle Keychain update semantics (without LAContext to avoid biometric prompt)
+- Two-stage biometric fallback: ACL creation failure → non-biometric; `SecItemAdd` `-34018` → retry without ACL
+- `save()` returns `Bool` indicating whether biometric was actually applied (metadata stores truth, not intent)
 
 #### MetadataStore
 

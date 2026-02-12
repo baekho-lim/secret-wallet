@@ -23,7 +23,7 @@ struct Init: ParsableCommand {
     )
 
     func run() throws {
-        print("🔐 Secret Wallet 초기화 중...")
+        print("🔐 Initializing Secret Wallet...")
 
         // Test Keychain access
         let testKey = "secret-wallet-test"
@@ -35,26 +35,26 @@ struct Init: ParsableCommand {
             try KeychainManager.delete(key: testKey)
 
             if retrieved == testValue {
-                print("✅ macOS Keychain 연동 완료")
+                print("✅ macOS Keychain connected")
                 let context = LAContext()
                 var authError: NSError?
                 if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) {
-                    print("✅ TouchID/FaceID 사용 가능 (비밀 추가 시 활성화)")
+                    print("✅ TouchID/FaceID available (enable per secret with --biometric)")
                 } else {
-                    let reason = authError?.localizedDescription ?? "알 수 없음"
-                    print("⚠️ TouchID/FaceID 사용 불가: \(reason)")
+                    let reason = authError?.localizedDescription ?? "unknown"
+                    print("⚠️ TouchID/FaceID unavailable: \(reason)")
                 }
                 print("")
-                print("사용법:")
-                print("  secret-wallet add <name>        # 비밀 추가")
-                print("  secret-wallet get <name>        # 비밀 조회")
-                print("  secret-wallet list              # 저장된 비밀 목록")
-                print("  secret-wallet inject -- <cmd>   # 환경변수 주입 후 명령 실행")
+                print("Usage:")
+                print("  secret-wallet add <name>        # Add a secret")
+                print("  secret-wallet get <name>        # Retrieve a secret")
+                print("  secret-wallet list              # List stored secrets")
+                print("  secret-wallet inject -- <cmd>   # Run command with secrets as env vars")
             } else {
                 throw SecretWalletError.keychainTestFailed
             }
         } catch {
-            print("❌ Keychain 접근 실패: \(error.localizedDescription)")
+            print("❌ Failed to access Keychain: \(error.localizedDescription)")
             throw ExitCode.failure
         }
     }
@@ -79,23 +79,23 @@ struct Add: ParsableCommand {
     func run() throws {
         let envVar = envName ?? name.uppercased().replacingOccurrences(of: "-", with: "_")
 
-        print("🔑 '\(name)' 비밀 추가 (환경변수: \(envVar))")
-        print("값을 입력하세요 (입력 내용은 표시되지 않음):")
+        print("🔑 Adding '\(name)' (env var: \(envVar))")
+        print("Enter value (input is hidden):")
 
         // Read secret without echo
         let secret = readSecretFromStdin()
 
         guard !secret.isEmpty else {
-            print("❌ 비밀 값이 비어있습니다")
+            print("❌ Secret value is empty")
             throw ExitCode.failure
         }
 
         do {
             // Store actual secret in Keychain
-            try KeychainManager.save(key: name, value: secret, biometric: biometric)
+            let biometricApplied = try KeychainManager.save(key: name, value: secret, biometric: biometric)
 
             // Store metadata (env var name mapping)
-            let metadata = SecretMetadata(name: name, envName: envVar, biometric: biometric)
+            let metadata = SecretMetadata(name: name, envName: envVar, biometric: biometricApplied)
             do {
                 try MetadataStore.save(metadata)
             } catch {
@@ -103,12 +103,14 @@ struct Add: ParsableCommand {
                 throw error
             }
 
-            print("✅ Keychain에 저장됨 (파일 없음)")
-            if biometric {
-                print("🔐 TouchID 인증 필요")
+            print("✅ Saved to Keychain (no plaintext files)")
+            if biometricApplied {
+                print("🔐 Biometric authentication required for access")
+            } else if biometric && !biometricApplied {
+                print("⚠️ Biometric unavailable -- saved with standard protection")
             }
         } catch {
-            print("❌ 저장 실패: \(error.localizedDescription)")
+            print("❌ Failed to save: \(error.localizedDescription)")
             throw ExitCode.failure
         }
     }
@@ -155,12 +157,12 @@ struct Get: ParsableCommand {
         do {
             let value = try KeychainManager.get(
                 key: name,
-                prompt: "secret-wallet에서 '\(name)' 비밀을 사용하려면 인증이 필요합니다."
+                prompt: "Authenticate to access '\(name)'"
             )
             // Output only the value (for piping)
             print(value, terminator: "")
         } catch {
-            FileHandle.standardError.write("❌ 조회 실패: \(error.localizedDescription)\n".data(using: .utf8)!)
+            FileHandle.standardError.write("❌ Failed to retrieve: \(error.localizedDescription)\n".data(using: .utf8)!)
             throw ExitCode.failure
         }
     }
@@ -177,12 +179,12 @@ struct List: ParsableCommand {
         let secrets = MetadataStore.list()
 
         if secrets.isEmpty {
-            print("저장된 비밀이 없습니다.")
-            print("'secret-wallet add <name>'으로 추가하세요.")
+            print("No secrets stored.")
+            print("Run 'secret-wallet add <name>' to add one.")
             return
         }
 
-        print("저장된 비밀 목록:")
+        print("Stored secrets:")
         print("")
         for secret in secrets {
             let biometricIcon = secret.biometric ? "🔐" : "🔓"
@@ -207,12 +209,12 @@ struct Remove: ParsableCommand {
         do {
             try KeychainManager.delete(
                 key: name,
-                prompt: "secret-wallet에서 '\(name)' 비밀을 삭제하려면 인증이 필요합니다."
+                prompt: "Authenticate to delete '\(name)'"
             )
             try MetadataStore.delete(name: name)
-            print("✅ '\(name)' 삭제됨")
+            print("✅ '\(name)' deleted")
         } catch {
-            print("❌ 삭제 실패: \(error.localizedDescription)")
+            print("❌ Failed to delete: \(error.localizedDescription)")
             throw ExitCode.failure
         }
     }
@@ -230,15 +232,15 @@ struct Inject: ParsableCommand {
 
     func run() throws {
         guard !command.isEmpty else {
-            print("❌ 실행할 명령어를 지정하세요")
-            print("사용법: secret-wallet inject -- <command>")
+            print("❌ No command specified")
+            print("Usage: secret-wallet inject -- <command>")
             throw ExitCode.failure
         }
 
         let secrets = MetadataStore.list()
 
         if secrets.isEmpty {
-            print("⚠️ 저장된 비밀이 없습니다. 명령어만 실행합니다.")
+            print("⚠️ No secrets stored. Running command without injection.")
         }
 
         // Build environment with secrets
@@ -252,18 +254,18 @@ struct Inject: ParsableCommand {
             do {
                 let value = try KeychainManager.get(
                     key: secret.name,
-                    prompt: "secret-wallet에서 '\(secret.name)' 비밀을 사용하려면 인증이 필요합니다.",
+                    prompt: "Authenticate to inject '\(secret.name)'",
                     context: authContext
                 )
                 env[secret.envName] = value
                 injectedCount += 1
             } catch {
-                FileHandle.standardError.write("⚠️ '\(secret.name)' 로드 실패: \(error.localizedDescription)\n".data(using: .utf8)!)
+                FileHandle.standardError.write("⚠️ Failed to load '\(secret.name)': \(error.localizedDescription)\n".data(using: .utf8)!)
             }
         }
 
         if injectedCount > 0 {
-            FileHandle.standardError.write("✅ \(injectedCount)개 비밀 주입됨\n".data(using: .utf8)!)
+            FileHandle.standardError.write("✅ \(injectedCount) secret(s) injected\n".data(using: .utf8)!)
         }
 
         // Execute command
@@ -287,7 +289,7 @@ struct Inject: ParsableCommand {
         } catch let error as ExitCode {
             throw error
         } catch {
-            print("❌ 명령 실행 실패: \(error.localizedDescription)")
+            print("❌ Failed to execute command: \(error.localizedDescription)")
             throw ExitCode.failure
         }
     }
@@ -361,9 +363,16 @@ struct Setup: ParsableCommand {
 enum KeychainManager {
     private static let service = "com.secret-wallet"
 
-    static func save(key: String, value: String, biometric: Bool = false) throws {
-        // Delete existing item first
-        try? delete(key: key)
+    /// Returns `true` if biometric was actually applied, `false` if it fell back to non-biometric.
+    @discardableResult
+    static func save(key: String, value: String, biometric: Bool = false) throws -> Bool {
+        // Delete without LAContext to avoid biometric prompt on overwrite
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
 
         guard let data = value.data(using: .utf8) else {
             throw SecretWalletError.encodingFailed
@@ -376,27 +385,41 @@ enum KeychainManager {
             kSecValueData as String: data,
         ]
 
+        var biometricApplied = false
+
         if biometric {
-            // Require biometric authentication
             var error: Unmanaged<CFError>?
-            guard let access = SecAccessControlCreateWithFlags(
+            if let access = SecAccessControlCreateWithFlags(
                 nil,
                 kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
                 .biometryCurrentSet,
                 &error
-            ) else {
-                throw SecretWalletError.accessControlFailed
+            ) {
+                query[kSecAttrAccessControl as String] = access
+                biometricApplied = true
+            } else {
+                // Fallback to non-biometric if ACL creation fails
+                query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             }
-            query[kSecAttrAccessControl as String] = access
         } else {
             query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         }
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
+
+        // -34018 (errSecMissingEntitlement): retry without biometric ACL
+        if status == errSecMissingEntitlement && biometricApplied {
+            query.removeValue(forKey: kSecAttrAccessControl as String)
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            biometricApplied = false
+            status = SecItemAdd(query as CFDictionary, nil)
+        }
 
         guard status == errSecSuccess else {
             throw SecretWalletError.keychainError(status)
         }
+
+        return biometricApplied
     }
 
     static func get(key: String, prompt: String? = nil, context: LAContext? = nil) throws -> String {
@@ -463,7 +486,8 @@ struct SecretMetadata: Codable {
 
 enum MetadataStore {
     private static var metadataURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         let dir = appSupport.appendingPathComponent("secret-wallet")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("metadata.json")
@@ -482,11 +506,16 @@ enum MetadataStore {
     }
 
     static func list() -> [SecretMetadata] {
-        guard let data = try? Data(contentsOf: metadataURL),
-              let metadata = try? JSONDecoder().decode([SecretMetadata].self, from: data) else {
+        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
             return []
         }
-        return metadata
+        do {
+            let data = try Data(contentsOf: metadataURL)
+            return try JSONDecoder().decode([SecretMetadata].self, from: data)
+        } catch {
+            FileHandle.standardError.write("⚠️ Metadata corrupted: \(error.localizedDescription)\n".data(using: .utf8)!)
+            return []
+        }
     }
 
     static func delete(name: String) throws {
@@ -511,15 +540,40 @@ enum SecretWalletError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .keychainTestFailed:
-            return "Keychain 테스트 실패"
+            return "Failed to access secure storage"
         case .encodingFailed:
-            return "데이터 인코딩 실패"
+            return "Failed to encode data"
         case .accessControlFailed:
-            return "Access Control 생성 실패"
+            return "Could not set up biometric protection"
         case .keychainError(let status):
-            return "Keychain 오류: \(status)"
+            return Self.describeOSStatus(status)
         case .notFound(let key):
-            return "'\(key)' 비밀을 찾을 수 없음"
+            return "Key '\(key)' not found"
+        }
+    }
+
+    private static func describeOSStatus(_ status: OSStatus) -> String {
+        switch status {
+        case errSecDuplicateItem:          // -25299
+            return "A key with this name already exists in Keychain"
+        case errSecItemNotFound:           // -25300
+            return "Key not found in secure storage"
+        case errSecAuthFailed:             // -25293
+            return "Authentication failed -- check your fingerprint or password"
+        case errSecUserCanceled:           // -128
+            return "Authentication was cancelled"
+        case errSecInteractionNotAllowed:  // -25308
+            return "Authentication is not available right now"
+        case errSecMissingEntitlement:     // -34018
+            return "App needs code signing for biometric protection"
+        case errSecIO:                     // -61
+            return "Keychain database error -- restart your Mac and try again"
+        case errSecDecode:                 // -26275
+            return "Stored data is corrupted"
+        case errSecParam:                  // -50
+            return "Internal error: invalid Keychain parameters"
+        default:
+            return "Keychain error (OSStatus \(status))"
         }
     }
 }

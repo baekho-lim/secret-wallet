@@ -6,9 +6,14 @@ struct AddKeyView: View {
     @State private var selectedService: AIService?
     @State private var keyName = ""
     @State private var keyValue = ""
-    @State private var useBiometric = true
+    @State private var useBiometric = BiometricService.isAvailable
     @State private var errorMessage: String?
     @State private var isSaving = false
+    @State private var showSuccess = false
+    @State private var showDuplicateWarning = false
+    @State private var pendingSaveName = ""
+    @State private var pendingSaveValue = ""
+    @State private var pendingSaveEnvName = ""
 
     let onSave: () -> Void
 
@@ -100,21 +105,24 @@ struct AddKeyView: View {
                         .toggleStyle(.switch)
                     }
 
-                    // Error
-                    if let errorMessage {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                            Text(errorMessage)
-                                .foregroundStyle(.red)
-                        }
-                        .font(.callout)
-                    }
                 }
                 .padding(24)
             }
 
             Divider()
+
+            // Error (always visible above save button)
+            if let errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
 
             // Save button
             HStack {
@@ -138,6 +146,29 @@ struct AddKeyView: View {
             .padding(16)
         }
         .frame(width: 460, height: 560)
+        .overlay {
+            if showSuccess {
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.green)
+                        .scaleEffect(showSuccess ? 1.0 : 0.5)
+                    Text("Saved!")
+                        .font(.title2.bold())
+                        .foregroundStyle(.primary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.ultraThinMaterial)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showSuccess)
+        .alert("Key Already Exists", isPresented: $showDuplicateWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Replace", role: .destructive) { performSave() }
+        } message: {
+            Text("'\(pendingSaveName)' already exists. Replace with the new value?")
+        }
     }
 
     private func saveKey() {
@@ -149,8 +180,6 @@ struct AddKeyView: View {
             return
         }
 
-        isSaving = true
-
         let sanitizedName = keyName
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
@@ -159,14 +188,31 @@ struct AddKeyView: View {
         let envName = selectedService?.defaultEnvName
             ?? sanitizedName.uppercased().replacingOccurrences(of: "-", with: "_")
 
+        // Store pending values for use after confirmation
+        pendingSaveName = sanitizedName
+        pendingSaveValue = trimmedValue
+        pendingSaveEnvName = envName
+
+        // Check for duplicate
+        if MetadataStore.list().contains(where: { $0.name == sanitizedName }) {
+            showDuplicateWarning = true
+            return
+        }
+
+        performSave()
+    }
+
+    private func performSave() {
+        isSaving = true
+
         Task {
             do {
-                try KeychainManager.save(key: sanitizedName, value: trimmedValue, biometric: useBiometric)
+                let biometricApplied = try KeychainManager.save(key: pendingSaveName, value: pendingSaveValue, biometric: useBiometric)
 
                 let metadata = SecretMetadata(
-                    name: sanitizedName,
-                    envName: envName,
-                    biometric: useBiometric,
+                    name: pendingSaveName,
+                    envName: pendingSaveEnvName,
+                    biometric: biometricApplied,
                     serviceName: selectedService?.id,
                     createdAt: Date()
                 )
@@ -175,7 +221,13 @@ struct AddKeyView: View {
                 await MainActor.run {
                     keyValue = ""
                     isSaving = false
+                    showSuccess = true
                     onSave()
+                }
+
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+                await MainActor.run {
                     dismiss()
                 }
             } catch {

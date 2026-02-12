@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0-alpha] - 2026-02-12
+
+### Added
+- **SwiftUI GUI app** (macOS 13+) -- native desktop app for managing API keys without terminal
+  - Dashboard view with key card list, search, and empty state
+  - Add Key flow: service presets (OpenAI, Anthropic, Google AI, OpenRouter) + name + paste
+  - Key cards with copy-to-clipboard and delete actions
+  - TouchID/FaceID toggle per key
+  - Error dialogs for failed operations (no silent failures)
+- AI service presets with icons and default env var names
+- Shared storage between CLI and GUI (same Keychain service + metadata file)
+
+### Security
+- Clipboard auto-clear after 30 seconds (using changeCount, not secret comparison)
+- API key value cleared from `@State` immediately after Keychain save
+- Thread-safe MetadataStore with serial DispatchQueue
+- Deprecated `kSecUseOperationPrompt` replaced with `LAContext.localizedReason`
+- Input validation: whitespace trimming on key values before save
+
+## [0.2.0] - 2026-02-10
+
+### Added
+- Shell integration: aliases (`sw`, `swa`, `swg`, `swl`, `swr`, `swi`)
+- Tab completion for secret names in `get` and `remove` commands
+- `setup` subcommand to install shell aliases and completions
+- `scripts/setup-shell.sh` for standalone shell configuration
+
 ## [0.1.0] - 2026-02-02
 
 ### Added
@@ -49,5 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline for Swift builds (.github/workflows/ci.yml)
 - Issue templates for bug reports, feature requests, and security reports
 
-[Unreleased]: https://github.com/baekho-lim/secret-wallet/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/baekho-lim/secret-wallet/compare/v0.3.0-alpha...HEAD
+[0.3.0-alpha]: https://github.com/baekho-lim/secret-wallet/compare/v0.2.0...v0.3.0-alpha
+[0.2.0]: https://github.com/baekho-lim/secret-wallet/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/baekho-lim/secret-wallet/releases/tag/v0.1.0

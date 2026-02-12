@@ -159,8 +159,8 @@ Security impact: Mitigates process memory dump attacks.
 
 ### Prerequisites
 
-- macOS 12.0 or later
-- Xcode Command Line Tools
+- macOS 13.0 or later
+- Xcode Command Line Tools (`xcode-select --install`)
 - Swift 5.9+
 
 ### Clone and Build
@@ -168,45 +168,63 @@ Security impact: Mitigates process memory dump attacks.
 ```bash
 git clone https://github.com/baekho-lim/secret-wallet.git
 cd secret-wallet
+```
+
+**CLI tool:**
+```bash
 swift build
 swift run secret-wallet init
+```
+
+**GUI app:**
+```bash
+cd App
+swift build
+open .build/debug/SecretWalletApp
 ```
 
 ### Run Tests
 
 ```bash
-swift test
+# Integration tests (CLI)
+./scripts/manual-test.sh
+
+# Manual testing
+swift run secret-wallet add test-key
+swift run secret-wallet get test-key
+swift run secret-wallet remove test-key
 ```
 
-### Manual Testing
+### Project Structure
 
-```bash
-# Build and test locally
-swift build
-.build/debug/secret-wallet init
-.build/debug/secret-wallet add test-key
-.build/debug/secret-wallet get test-key
-.build/debug/secret-wallet remove test-key
 ```
+secret-wallet/
+├── Sources/secret-wallet/main.swift   # CLI tool
+├── App/                                # GUI app (separate Package.swift)
+│   ├── Package.swift
+│   └── SecretWalletApp/
+│       ├── Views/                      # SwiftUI views
+│       ├── Services/                   # Keychain, Metadata, Biometric
+│       └── Models/                     # Data models
+├── scripts/                            # Shell scripts
+└── docs/                               # Architecture docs
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed technical design.
 
 ---
 
 ## 🎯 Current Focus & Roadmap
 
-### Short-term (v0.2.0)
-- [ ] Automatic secret rotation
-- [ ] Audit logging (track access)
-- [ ] OpenClaw native integration
+### Done
+- [x] CLI MVP (init, add, get, list, remove, inject)
+- [x] Shell integration (aliases, tab completion)
+- [x] SwiftUI GUI app (macOS)
 
-### Medium-term (v0.3.0)
+### Next
+- [ ] GUI polish + .dmg distribution
 - [ ] Multi-profile support (dev/staging/prod)
-- [ ] Secret expiration warnings
-- [ ] Import/export (encrypted backup)
-
-### Long-term (v1.0.0)
-- [ ] Linux support (libsecret)
-- [ ] Windows support (Credential Manager)
-- [ ] Browser extension integration
+- [ ] Windows support (Tauri + Credential Manager)
 
 **Want to work on something?** Check [Good First Issues](https://github.com/baekho-lim/secret-wallet/labels/good%20first%20issue).
 

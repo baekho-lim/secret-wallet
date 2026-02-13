@@ -34,8 +34,8 @@ if [ "${1:-}" = "--full" ]; then
 fi
 
 # Binary path
-BINARY="${BINARY:-./.build/release/secret-wallet}"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BINARY="${BINARY:-$PROJECT_ROOT/.build/release/secret-wallet}"
 
 # ─── Helpers ─────────────────────────────────────────
 
@@ -110,10 +110,10 @@ echo -e "${BOLD}${BLUE}=== P0: CLI Functional Tests ===${NC}"
 # ─── CLI-01 ──────────────────────────────────────────
 run_test "CLI-01" "Version output"
 VERSION=$($BINARY --version 2>&1 || echo "")
-if echo "$VERSION" | grep -q "0.1.0"; then
+if echo "$VERSION" | grep -q "0.3.0-alpha"; then
     pass "Version: $VERSION"
 else
-    fail "Expected '0.1.0', got: '$VERSION'"
+    fail "Expected '0.3.0-alpha', got: '$VERSION'"
 fi
 
 # ─── CLI-02 ──────────────────────────────────────────
@@ -305,22 +305,20 @@ fi
 
 # ─── SEC-08 ──────────────────────────────────────────
 run_test "SEC-08" "Keychain service ID consistency (CLI == GUI)"
-CLI_SERVICE=$(grep -o 'service.*=.*"com\.secret-wallet"' "$PROJECT_ROOT/Sources/secret-wallet/main.swift" 2>/dev/null | head -1)
-GUI_SERVICE=$(grep -o 'service.*=.*"com\.secret-wallet"' "$PROJECT_ROOT/App/SecretWalletApp/Services/KeychainManager.swift" 2>/dev/null | head -1)
-if [ -n "$CLI_SERVICE" ] && [ -n "$GUI_SERVICE" ]; then
-    pass "Both use 'com.secret-wallet'"
+CORE_SERVICE=$(grep -o 'service.*=.*"com\.secret-wallet"' "$PROJECT_ROOT/Sources/SecretWalletCore/KeychainManager.swift" 2>/dev/null | head -1)
+if [ -n "$CORE_SERVICE" ]; then
+    pass "SharedCore uses 'com.secret-wallet' (single source of truth)"
 else
-    fail "Service ID mismatch -- CLI: '$CLI_SERVICE', GUI: '$GUI_SERVICE'"
+    fail "Service ID not found in SharedCore"
 fi
 
 # ─── SEC-09 ──────────────────────────────────────────
 run_test "SEC-09" "Keychain items device-only (no iCloud sync)"
-CLI_ACL=$(grep -c "WhenUnlockedThisDeviceOnly" "$PROJECT_ROOT/Sources/secret-wallet/main.swift" 2>/dev/null || echo "0")
-GUI_ACL=$(grep -c "WhenUnlockedThisDeviceOnly" "$PROJECT_ROOT/App/SecretWalletApp/Services/KeychainManager.swift" 2>/dev/null || echo "0")
-if [ "$CLI_ACL" -ge 1 ] && [ "$GUI_ACL" -ge 1 ]; then
-    pass "CLI: $CLI_ACL refs, GUI: $GUI_ACL refs"
+CORE_ACL=$(grep -c "WhenUnlockedThisDeviceOnly" "$PROJECT_ROOT/Sources/SecretWalletCore/KeychainManager.swift" 2>/dev/null || echo "0")
+if [ "$CORE_ACL" -ge 1 ]; then
+    pass "SharedCore: $CORE_ACL refs to WhenUnlockedThisDeviceOnly"
 else
-    fail "Missing device-only ACL -- CLI: $CLI_ACL, GUI: $GUI_ACL"
+    fail "Missing device-only ACL in SharedCore: $CORE_ACL"
 fi
 
 # ─── SEC-10 ──────────────────────────────────────────

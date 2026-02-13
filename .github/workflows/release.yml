@@ -37,32 +37,55 @@ jobs:
         fi
         echo "Version verified: $BINARY_VERSION"
 
-    - name: Create archive
+    - name: Create CLI archive
       run: |
         tar czf secret-wallet-arm64-darwin.tar.gz \
           -C .build/release secret-wallet
 
-    - name: Generate SHA256
+    - name: Generate CLI SHA256
       run: |
         shasum -a 256 secret-wallet-arm64-darwin.tar.gz | tee sha256.txt
+
+    - name: Install create-dmg
+      run: brew install create-dmg
+
+    - name: Generate app icon
+      run: |
+        chmod +x scripts/generate-icon.sh
+        scripts/generate-icon.sh
+
+    - name: Build GUI DMG
+      run: |
+        chmod +x scripts/build-dmg.sh
+        scripts/build-dmg.sh ${GITHUB_REF_NAME#v}
+
+    - name: Generate DMG SHA256
+      run: |
+        shasum -a 256 dist/SecretWallet-*.dmg >> sha256.txt
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
           secret-wallet-arm64-darwin.tar.gz
+          dist/SecretWallet-*.dmg
           sha256.txt
         generate_release_notes: true
         body: |
           ## Install
 
-          ### Homebrew (recommended)
+          ### GUI (DMG)
+          Download `SecretWallet-${{ github.ref_name }}.dmg`, open it, and drag to Applications.
+
+          > First launch: System Settings → Privacy & Security → "Open Anyway"
+
+          ### CLI via Homebrew (recommended)
           ```bash
           brew tap baekho-lim/tap
           brew install secret-wallet
           ```
 
-          ### Manual
+          ### CLI Manual
           ```bash
           curl -L https://github.com/baekho-lim/secret-wallet/releases/download/${{ github.ref_name }}/secret-wallet-arm64-darwin.tar.gz | tar xz
           sudo mv secret-wallet /usr/local/bin/

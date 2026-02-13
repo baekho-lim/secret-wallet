@@ -9,3 +9,4 @@ DerivedData/
 .netrc
 HANDOFF.md
 .claude-progress.md
+/dist/

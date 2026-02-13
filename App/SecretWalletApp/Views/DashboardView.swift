@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import SecretWalletCore
 
 struct DashboardView: View {
     @State private var secrets: [SecretMetadata] = []
@@ -149,38 +150,52 @@ struct DashboardView: View {
     }
 
     private func copyKey(_ secret: SecretMetadata) {
-        do {
-            let value = try KeychainManager.get(
-                key: secret.name,
-                prompt: "Copy '\(secret.displayName)' to clipboard"
-            )
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(value, forType: .string)
-
-            // Auto-clear clipboard after 30 seconds using changeCount (avoids holding secret in closure)
-            let changeCount = NSPasteboard.general.changeCount
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-                if NSPasteboard.general.changeCount == changeCount {
+        Task {
+            do {
+                let value = try KeychainManager.get(
+                    key: secret.name,
+                    prompt: "Copy '\(secret.displayName)' to clipboard",
+                    requiresAuth: secret.biometric
+                )
+                await MainActor.run {
                     NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+
+                    // Auto-clear clipboard after 30 seconds using changeCount (avoids holding secret in closure)
+                    let changeCount = NSPasteboard.general.changeCount
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                        if NSPasteboard.general.changeCount == changeCount {
+                            NSPasteboard.general.clearContents()
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    alertMessage = error.localizedDescription
+                    showAlert = true
                 }
             }
-        } catch {
-            alertMessage = error.localizedDescription
-            showAlert = true
         }
     }
 
     private func deleteKey(_ secret: SecretMetadata) {
-        do {
-            try KeychainManager.delete(
-                key: secret.name,
-                prompt: "Delete '\(secret.displayName)'"
-            )
-            try MetadataStore.delete(name: secret.name)
-            loadSecrets()
-        } catch {
-            alertMessage = error.localizedDescription
-            showAlert = true
+        Task {
+            do {
+                try KeychainManager.delete(
+                    key: secret.name,
+                    prompt: "Delete '\(secret.displayName)'",
+                    requiresAuth: secret.biometric
+                )
+                try MetadataStore.delete(name: secret.name)
+                await MainActor.run {
+                    loadSecrets()
+                }
+            } catch {
+                await MainActor.run {
+                    alertMessage = error.localizedDescription
+                    showAlert = true
+                }
+            }
         }
     }
 }

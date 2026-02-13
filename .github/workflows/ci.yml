@@ -40,6 +40,9 @@ jobs:
         .build/release/secret-wallet --version
         echo "Build successful!"
 
+    - name: Build GUI app
+      run: cd App && swift build -c release
+
   lint:
     name: Swift Lint
     runs-on: macos-latest

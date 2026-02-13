@@ -1,4 +1,5 @@
 import SwiftUI
+import SecretWalletCore
 
 struct KeyCardView: View {
     let metadata: SecretMetadata

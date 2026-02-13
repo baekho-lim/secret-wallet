@@ -1,4 +1,5 @@
 import SwiftUI
+import SecretWalletCore
 
 struct AddKeyView: View {
     @Environment(\.dismiss) private var dismiss

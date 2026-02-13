@@ -7,9 +7,15 @@ let package = Package(
     platforms: [
         .macOS(.v13)
     ],
+    dependencies: [
+        .package(path: ".."),
+    ],
     targets: [
         .executableTarget(
             name: "SecretWalletApp",
+            dependencies: [
+                .product(name: "SecretWalletCore", package: "secret-wallet"),
+            ],
             path: "SecretWalletApp",
             linkerSettings: [
                 .linkedFramework("Security"),

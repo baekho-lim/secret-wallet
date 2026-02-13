@@ -25,7 +25,7 @@ struct Add: ParsableCommand {
         let secret = readSecretFromStdin()
 
         guard !secret.isEmpty else {
-            print("❌ Secret value is empty")
+            stderr("❌ Secret value is empty\n")
             throw ExitCode.failure
         }
 
@@ -47,7 +47,7 @@ struct Add: ParsableCommand {
                 print("⚠️ Biometric unavailable -- saved with standard protection")
             }
         } catch {
-            print("❌ Failed to save: \(error.localizedDescription)")
+            stderr("❌ Failed to save: \(error.localizedDescription)\n")
             throw ExitCode.failure
         }
     }

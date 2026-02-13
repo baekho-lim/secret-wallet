@@ -1,6 +1,5 @@
 import ArgumentParser
 import Foundation
-import LocalAuthentication
 import SecretWalletCore
 
 struct Init: ParsableCommand {
@@ -21,13 +20,10 @@ struct Init: ParsableCommand {
 
             if retrieved == testValue {
                 print("✅ macOS Keychain connected")
-                let context = LAContext()
-                var authError: NSError?
-                if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) {
-                    print("✅ TouchID/FaceID available (enable per secret with --biometric)")
+                if BiometricService.isAvailable {
+                    print("✅ \(BiometricService.biometricTypeName) available (enable per secret with --biometric)")
                 } else {
-                    let reason = authError?.localizedDescription ?? "unknown"
-                    print("⚠️ TouchID/FaceID unavailable: \(reason)")
+                    print("⚠️ \(BiometricService.biometricTypeName) unavailable")
                 }
                 print("")
                 print("Usage:")
@@ -39,7 +35,7 @@ struct Init: ParsableCommand {
                 throw SecretWalletError.keychainTestFailed
             }
         } catch {
-            print("❌ Failed to access Keychain: \(error.localizedDescription)")
+            stderr("❌ Failed to access Keychain: \(error.localizedDescription)\n")
             throw ExitCode.failure
         }
     }

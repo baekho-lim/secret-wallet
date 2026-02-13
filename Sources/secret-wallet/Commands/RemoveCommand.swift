@@ -22,7 +22,7 @@ struct Remove: ParsableCommand {
             try MetadataStore.delete(name: name)
             print("✅ '\(name)' deleted")
         } catch {
-            print("❌ Failed to delete: \(error.localizedDescription)")
+            stderr("❌ Failed to delete: \(error.localizedDescription)\n")
             throw ExitCode.failure
         }
     }

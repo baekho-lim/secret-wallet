@@ -65,11 +65,102 @@ public enum KeychainManager {
         return biometricApplied
     }
 
+    // MARK: - Get (sync for CLI, uses DispatchSemaphore-based preAuthenticate)
+
     public static func get(
         key: String,
         prompt: String? = nil,
         context: LAContext? = nil,
         requiresAuth: Bool = false
+    ) throws -> String {
+        var authContext: LAContext?
+        if requiresAuth {
+            if let context {
+                authContext = context
+            } else {
+                guard let authed = BiometricService.preAuthenticate(
+                    reason: prompt ?? "Authenticate to access secret"
+                ) else {
+                    throw SecretWalletError.keychainError(errSecUserCanceled)
+                }
+                authContext = authed
+            }
+        }
+        return try performGet(key: key, authContext: authContext, requiresAuth: requiresAuth)
+    }
+
+    // MARK: - Get (async for GUI, safe in Swift concurrency Task context)
+
+    public static func get(
+        key: String,
+        prompt: String? = nil,
+        context: LAContext? = nil,
+        requiresAuth: Bool = false
+    ) async throws -> String {
+        var authContext: LAContext?
+        if requiresAuth {
+            if let context {
+                authContext = context
+            } else {
+                authContext = try await BiometricService.preAuthenticateAsync(
+                    reason: prompt ?? "Authenticate to access secret"
+                )
+            }
+        }
+        return try performGet(key: key, authContext: authContext, requiresAuth: requiresAuth)
+    }
+
+    // MARK: - Delete (sync for CLI)
+
+    public static func delete(
+        key: String,
+        prompt: String? = nil,
+        context: LAContext? = nil,
+        requiresAuth: Bool = false
+    ) throws {
+        var authContext: LAContext?
+        if requiresAuth {
+            if let context {
+                authContext = context
+            } else {
+                guard let authed = BiometricService.preAuthenticate(
+                    reason: prompt ?? "Authenticate to delete secret"
+                ) else {
+                    throw SecretWalletError.keychainError(errSecUserCanceled)
+                }
+                authContext = authed
+            }
+        }
+        try performDelete(key: key, authContext: authContext, requiresAuth: requiresAuth)
+    }
+
+    // MARK: - Delete (async for GUI)
+
+    public static func delete(
+        key: String,
+        prompt: String? = nil,
+        context: LAContext? = nil,
+        requiresAuth: Bool = false
+    ) async throws {
+        var authContext: LAContext?
+        if requiresAuth {
+            if let context {
+                authContext = context
+            } else {
+                authContext = try await BiometricService.preAuthenticateAsync(
+                    reason: prompt ?? "Authenticate to delete secret"
+                )
+            }
+        }
+        try performDelete(key: key, authContext: authContext, requiresAuth: requiresAuth)
+    }
+
+    // MARK: - Shared Keychain Operations
+
+    private static func performGet(
+        key: String,
+        authContext: LAContext?,
+        requiresAuth: Bool
     ) throws -> String {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -79,19 +170,8 @@ public enum KeychainManager {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
-        // Only attach LAContext for biometric-protected items.
-        // For non-biometric items, adding LAContext to unsigned apps triggers macOS password dialog.
-        if requiresAuth {
-            if let context {
-                query[kSecUseAuthenticationContext as String] = context
-            } else {
-                guard let authedContext = BiometricService.preAuthenticate(
-                    reason: prompt ?? "Authenticate to access secret"
-                ) else {
-                    throw SecretWalletError.keychainError(errSecUserCanceled)
-                }
-                query[kSecUseAuthenticationContext as String] = authedContext
-            }
+        if let authContext {
+            query[kSecUseAuthenticationContext as String] = authContext
         }
 
         var result: AnyObject?
@@ -123,11 +203,10 @@ public enum KeychainManager {
         return value
     }
 
-    public static func delete(
+    private static func performDelete(
         key: String,
-        prompt: String? = nil,
-        context: LAContext? = nil,
-        requiresAuth: Bool = false
+        authContext: LAContext?,
+        requiresAuth: Bool
     ) throws {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -135,17 +214,8 @@ public enum KeychainManager {
             kSecAttrAccount as String: key,
         ]
 
-        if requiresAuth {
-            if let context {
-                query[kSecUseAuthenticationContext as String] = context
-            } else {
-                guard let authedContext = BiometricService.preAuthenticate(
-                    reason: prompt ?? "Authenticate to delete secret"
-                ) else {
-                    throw SecretWalletError.keychainError(errSecUserCanceled)
-                }
-                query[kSecUseAuthenticationContext as String] = authedContext
-            }
+        if let authContext {
+            query[kSecUseAuthenticationContext as String] = authContext
         }
 
         let status = SecItemDelete(query as CFDictionary)

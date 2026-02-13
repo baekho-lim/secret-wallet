@@ -152,7 +152,7 @@ struct DashboardView: View {
     private func copyKey(_ secret: SecretMetadata) {
         Task {
             do {
-                let value = try KeychainManager.get(
+                let value = try await KeychainManager.get(
                     key: secret.name,
                     prompt: "Copy '\(secret.displayName)' to clipboard",
                     requiresAuth: secret.biometric
@@ -181,7 +181,7 @@ struct DashboardView: View {
     private func deleteKey(_ secret: SecretMetadata) {
         Task {
             do {
-                try KeychainManager.delete(
+                try await KeychainManager.delete(
                     key: secret.name,
                     prompt: "Delete '\(secret.displayName)'",
                     requiresAuth: secret.biometric

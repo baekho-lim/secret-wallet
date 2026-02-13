@@ -1,6 +1,5 @@
 import ArgumentParser
 import Foundation
-import LocalAuthentication
 import SecretWalletCore
 
 struct Inject: ParsableCommand {
@@ -13,22 +12,21 @@ struct Inject: ParsableCommand {
 
     func run() throws {
         guard !command.isEmpty else {
-            print("❌ No command specified")
-            print("Usage: secret-wallet inject -- <command>")
+            stderr("❌ No command specified\n")
+            stderr("Usage: secret-wallet inject -- <command>\n")
             throw ExitCode.failure
         }
 
         let secrets = MetadataStore.list()
 
         if secrets.isEmpty {
-            print("⚠️ No secrets stored. Running command without injection.")
+            stderr("⚠️ No secrets stored. Running command without injection.\n")
         }
 
         var env = ProcessInfo.processInfo.environment
         var injectedCount = 0
 
-        let authContext = LAContext()
-        authContext.touchIDAuthenticationAllowableReuseDuration = 10
+        let authContext = BiometricService.createBatchContext()
 
         // Pre-authenticate once if any secrets require biometric
         let hasBiometric = secrets.contains { $0.biometric }
@@ -80,7 +78,7 @@ struct Inject: ParsableCommand {
         } catch let error as ExitCode {
             throw error
         } catch {
-            print("❌ Failed to execute command: \(error.localizedDescription)")
+            stderr("❌ Failed to execute command: \(error.localizedDescription)\n")
             throw ExitCode.failure
         }
     }

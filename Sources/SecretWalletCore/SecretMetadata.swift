@@ -4,8 +4,8 @@ public struct SecretMetadata: Codable, Identifiable, Sendable {
     public let name: String
     public let envName: String
     public let biometric: Bool
-    public var serviceName: String?
-    public var createdAt: Date?
+    public let serviceName: String?
+    public let createdAt: Date?
 
     public var id: String { name }
 

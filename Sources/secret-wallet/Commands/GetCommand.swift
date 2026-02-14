@@ -12,6 +12,9 @@ struct Get: ParsableCommand {
     })
     var name: String
 
+    @Flag(name: .long, help: "Output as JSON with metadata")
+    var json: Bool = false
+
     func run() throws {
         do {
             let metadata = MetadataStore.list().first { $0.name == name }
@@ -20,7 +23,21 @@ struct Get: ParsableCommand {
                 prompt: "Authenticate to access '\(name)'",
                 requiresAuth: metadata?.biometric ?? false
             )
-            print(value, terminator: "")
+
+            if json {
+                let result: [String: String] = [
+                    "name": name,
+                    "value": value,
+                    "envName": metadata?.envName ?? name,
+                    "biometric": (metadata?.biometric ?? false) ? "true" : "false",
+                ]
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let data = try encoder.encode(result)
+                print(String(data: data, encoding: .utf8) ?? "{}")
+            } else {
+                print(value, terminator: "")
+            }
         } catch {
             stderr("❌ Failed to retrieve: \(error.localizedDescription)\n")
             throw ExitCode.failure

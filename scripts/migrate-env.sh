@@ -71,13 +71,13 @@ parse_env_file() {
 
             # Skip public keys (not secrets) unless --include-public
             if [[ "$include_public" == "false" && "$key" =~ ^NEXT_PUBLIC_ ]]; then
-                PUBLIC_SKIPPED=$((PUBLIC_SKIPPED + 1))
+                echo "@@PUBLIC_SKIP@@"
                 continue
             fi
 
             # Skip non-secret config values
             if is_config_value "$key" "$value"; then
-                SKIPPED=$((SKIPPED + 1))
+                echo "@@CONFIG_SKIP@@"
                 continue
             fi
 
@@ -128,6 +128,7 @@ import_key() {
     local key="$1"
     local value="$2"
     local dry_run="$3"
+    local biometric="${4:-false}"
 
     if [ "$dry_run" == "true" ]; then
         echo -e "  ${CYAN}[DRY-RUN]${NC} Would import: ${BLUE}$key${NC}"
@@ -141,7 +142,12 @@ import_key() {
         return 0
     fi
 
-    if echo "$value" | secret-wallet add "$key" --env-name "$key" 2>/dev/null; then
+    local add_args=("add" "$key" "--env-name" "$key")
+    if [ "$biometric" == "true" ]; then
+        add_args+=("--biometric")
+    fi
+
+    if echo "$value" | secret-wallet "${add_args[@]}" 2>/dev/null; then
         echo -e "  ${GREEN}[OK]${NC} Imported: ${BLUE}$key${NC}"
         IMPORTED=$((IMPORTED + 1))
     else
@@ -264,6 +270,13 @@ main() {
     local entries
     entries=$(parse_env_file "$env_file" "$include_public")
 
+    # Count skipped entries from subshell markers
+    PUBLIC_SKIPPED=$(echo "$entries" | grep -c '@@PUBLIC_SKIP@@' || true)
+    SKIPPED=$(echo "$entries" | grep -c '@@CONFIG_SKIP@@' || true)
+
+    # Filter out markers, keep only real entries
+    entries=$(echo "$entries" | grep -v '^@@.*@@$')
+
     if [ -z "$entries" ]; then
         echo -e "${YELLOW}No importable secrets found in $env_file${NC}"
         [ "$PUBLIC_SKIPPED" -gt 0 ] && echo -e "  (${PUBLIC_SKIPPED} NEXT_PUBLIC_* keys skipped, use --include-public to include)"
@@ -276,7 +289,12 @@ main() {
     echo -e "Found ${GREEN}${total}${NC} secret(s) to import:"
     echo ""
 
-    while IFS='=' read -r key value; do
+    while IFS= read -r entry; do
+        [ -z "$entry" ] && continue
+
+        # Split on first '=' only (values may contain '=')
+        local key="${entry%%=*}"
+        local value="${entry#*=}"
         [ -z "$key" ] && continue
 
         if [ "$mode" == "interactive" ]; then
@@ -296,7 +314,7 @@ main() {
             esac
         fi
 
-        import_key "$key" "$value" "$dry_run"
+        import_key "$key" "$value" "$dry_run" "$biometric"
     done <<< "$entries"
 
     print_summary "$dry_run"

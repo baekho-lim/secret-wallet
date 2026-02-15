@@ -31,7 +31,7 @@ secret-wallet inject -- npm run dev   # Keys injected, process exits, keys gone
 | Git risk | One mistake = exposed | Nothing to commit |
 | Access control | File permissions (anyone can `cat`) | OS Keychain ACL (app-level) |
 | Process isolation | Loaded globally via `dotenv` | Child process only, destroyed on exit |
-| Hardware backing | None | Secure Enclave (T2/M1/M2/M3/M4) |
+| Hardware backing | None | Secure Enclave (biometric keys) |
 | Cost | Free | Free |
 | Setup | Create file, add to `.gitignore` | `brew install`, done |
 
@@ -259,15 +259,15 @@ A native SwiftUI app for managing keys without the terminal.
 ├─────────────────────────────────────────┤
 │  Layer 3: OS-Level Access Control       │  Keychain ACL enforcement
 ├─────────────────────────────────────────┤
-│  Layer 2: Secure Enclave               │  Hardware-backed encryption (T2/M1~M4)
+│  Layer 2: Secure Enclave               │  Hardware key storage (biometric keys)
 ├─────────────────────────────────────────┤
 │  Layer 1: Physical Device Security      │  FileVault full-disk encryption
 └─────────────────────────────────────────┘
 ```
 
-**Layers 1-4, 6-7 are always active.** Layer 5 (biometric) is opt-in per key.
+**Layers 1, 3-4, 6-7 are always active.** Layer 5 (biometric) and Layer 2 (Secure Enclave) are fully engaged only for biometric-protected keys. Non-biometric keys are still encrypted by Keychain (Layer 4) and protected by OS-level ACLs (Layer 3).
 
-Even without TouchID, Secret Wallet provides 6 active security layers -- compared to `.env` files which have zero.
+Even without TouchID, Secret Wallet provides 5 active security layers -- compared to `.env` files which have zero.
 
 ### Threat Mitigations
 
@@ -293,7 +293,7 @@ For the full threat model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | **Account required** | No | Yes (email + master password) | **No** |
 | **Setup time** | Create file | Install + sign in + vault setup | **`brew install`** |
 | **Encryption** | None | AES-256-GCM (cloud) | **AES-256-GCM (local Keychain)** |
-| **Hardware security** | None | None | **Secure Enclave** |
+| **Hardware security** | None | None | **Secure Enclave (biometric keys)** |
 | **Biometric** | No | App unlock only | **Per-key TouchID** |
 | **Process isolation** | No (`dotenv` loads globally) | Partial (`op run`) | **Full (child process only)** |
 | **Cross-platform** | Yes | Yes | macOS only |
@@ -420,7 +420,7 @@ secret-wallet inject -- vercel deploy --prod
 No. TouchID is **optional and per-key**. Keys added without `--biometric` work instantly without any prompt. Only use `--biometric` for high-security keys (production DB, payment API, etc.).
 
 **Q: Is it safe without TouchID?**
-Yes. Even without biometric, you still get 6 security layers: Keychain encryption, Secure Enclave, OS-level ACL, process isolation, runtime injection, and FileVault. `.env` files have zero of these.
+Yes. Even without biometric, you still get 5 security layers: Keychain encryption (AES-256-GCM), OS-level ACL, process isolation, runtime injection, and FileVault. Biometric-protected keys additionally get Secure Enclave hardware backing. `.env` files have zero of these layers.
 
 **Q: Can the GUI and CLI share keys?**
 Yes. Both use the same Keychain service (`com.secret-wallet`) and metadata file.

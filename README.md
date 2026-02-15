@@ -1,105 +1,78 @@
 # Secret Wallet
 
-> Secure API key management for macOS -- CLI + GUI
+> Zero-config API key security for macOS developers -- CLI + GUI
 
 [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-macOS%2013+-blue.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Secret Wallet protects your API keys using macOS Keychain and biometric authentication (TouchID/FaceID). Available as both a **CLI tool** for developers and a **SwiftUI desktop app** for everyone.
+Secret Wallet replaces plaintext `.env` files with macOS Keychain encryption. No account needed. No subscription. Just install and your API keys are hardware-encrypted.
 
-**No plaintext config files. No `.env` exposure. Just fingerprint and go.**
-
----
-
-## Table of Contents
-
-- [Why Secret Wallet?](#why-secret-wallet)
-- [Two Ways to Use](#two-ways-to-use)
-- [Installation](#installation)
-- [GUI App](#gui-app)
-- [CLI Usage](#cli-usage)
-- [Security Model](#security-model)
-- [Architecture](#architecture)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## Why Secret Wallet?
-
-AI tools like OpenClaw/Moltbot, Cursor, and Windsurf need API keys. Most people store them in plaintext:
-
-```json
-// ~/.openclaw/auth-profiles.json
-{ "token": "sk-proj-xxxxxxxxxxxxx" }  // Exposed!
+```bash
+brew install baekho-lim/tap/secret-wallet
+secret-wallet add OPENAI_KEY
+secret-wallet inject -- npm run dev   # Keys injected, process exits, keys gone
 ```
 
-**This is dangerous:**
-- Visible in filesystem, git history, backups
-- Any process can read them
-- One malware = all keys stolen (see [CVE-2026-25253](https://github.com/transitive-bullshit/OpenClaw/security/advisories))
-
-**Secret Wallet fixes this** by storing keys in macOS Keychain (AES-256-GCM, hardware-backed) and requiring TouchID to access them.
-
 ---
 
-## Two Ways to Use
+## Why Not `.env` Files?
 
-### GUI App (for everyone)
+```
+.env file:
+  OPENAI_API_KEY=sk-proj-xxxxx     ← plaintext on disk
+  SUPABASE_KEY=eyJhbGciOiJI...     ← any process can read
+                                    ← one git add mistake = leaked
+```
 
-A native macOS SwiftUI app. No terminal needed.
-
-- Add keys by selecting a service and pasting
-- Copy with one click + TouchID
-- Auto-clears clipboard after 30 seconds
-- Presets for OpenAI, Anthropic, Google AI, OpenRouter
-
-### CLI Tool (for developers)
-
-A command-line tool with process isolation.
-
-- Inject keys as env vars into child processes
-- Shell aliases (`sw`, `swa`, `swg`, `swl`, `swr`, `swi`)
-- Tab completion for key names
-- Zero credentials in parent process memory
-
-**Both share the same Keychain storage and metadata** -- keys added in the GUI are available in the CLI, and vice versa.
+| Aspect | `.env` files | Secret Wallet |
+|--------|-------------|---------------|
+| Storage | Plaintext on disk | macOS Keychain (AES-256-GCM) |
+| Git risk | One mistake = exposed | Nothing to commit |
+| Access control | File permissions (anyone can `cat`) | OS Keychain ACL (app-level) |
+| Process isolation | Loaded globally via `dotenv` | Child process only, destroyed on exit |
+| Hardware backing | None | Secure Enclave (T2/M1/M2/M3/M4) |
+| Cost | Free | Free |
+| Setup | Create file, add to `.gitignore` | `brew install`, done |
 
 ---
 
 ## Installation
 
-### Prerequisites
+### Homebrew (recommended)
 
-- macOS 13.0 or later
-- Xcode Command Line Tools (`xcode-select --install`)
+```bash
+brew install baekho-lim/tap/secret-wallet
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/baekho-lim/secret-wallet.git
+cd secret-wallet
+swift build -c release
+cp .build/release/secret-wallet /usr/local/bin/
+```
 
 ### GUI App
 
 ```bash
-git clone https://github.com/baekho-lim/secret-wallet.git
 cd secret-wallet/App
 swift build -c release
 open .build/release/SecretWalletApp
 ```
 
-### CLI Tool
+### Shell Aliases (optional)
 
 ```bash
-cd secret-wallet
-swift build -c release
-cp .build/release/secret-wallet /usr/local/bin/
-secret-wallet setup  # Install shell aliases
+secret-wallet setup    # Installs aliases to ~/.zshrc
 source ~/.zshrc
 ```
-
-### Shell Aliases (CLI)
 
 | Shortcut | Full Command | Description |
 |----------|-------------|-------------|
 | `sw` | `secret-wallet` | Base command |
-| `swa KEY -b` | `secret-wallet add KEY --biometric` | Add secret |
+| `swa KEY` | `secret-wallet add KEY` | Add secret |
 | `swg KEY` | `secret-wallet get KEY` | Get secret |
 | `swl` | `secret-wallet list` | List secrets |
 | `swr KEY` | `secret-wallet remove KEY` | Remove secret |
@@ -107,83 +80,172 @@ source ~/.zshrc
 
 ---
 
-## GUI App
+## Quick Start
 
-### Dashboard
+### 1. Add your first key
 
-The main screen shows all your saved keys as cards:
+```bash
+secret-wallet add OPENAI_KEY
+# Enter value (hidden input): sk-proj-xxxxxxxx
+```
 
-- Service icon and color (OpenAI = green, Anthropic = orange, etc.)
-- Key name and environment variable mapping
-- TouchID badge for biometric-protected keys
-- Copy and Delete buttons on each card
-- Search bar (appears when you have 4+ keys)
+### 2. Verify
 
-### Adding a Key
+```bash
+secret-wallet list
+# OPENAI_KEY  (env: OPENAI_KEY)  biometric: no
 
-Three-step flow:
+secret-wallet status
+# { "version": "0.3.0-alpha", "secrets": { "total": 1 }, ... }
+```
 
-1. **Select Service** -- Choose from presets (OpenAI, Anthropic, Google AI, OpenRouter, Other)
-2. **Name** -- Give your key a friendly name
-3. **Paste Key** -- Paste your API key (shown as dots, never in plaintext)
+### 3. Use in your project
 
-Toggle TouchID protection, then hit "Save Securely".
+```bash
+# Run any command with keys injected as environment variables
+secret-wallet inject -- npm run dev
 
-### Copying a Key
-
-Click the copy icon on any card. TouchID prompt appears (if enabled). Key is copied to clipboard and **auto-cleared after 30 seconds**.
-
-### Deleting a Key
-
-Click the trash icon. Confirm in the dialog. The key is permanently removed from Keychain.
+# Your app reads process.env.OPENAI_KEY as usual
+# When the process exits, the keys are gone from memory
+```
 
 ---
 
-## CLI Usage
+## Migrating from `.env` Files
 
-### Quick Start
+Secret Wallet includes a migration tool that scans `.env` files and imports secrets in bulk.
+
+### Scan your projects
 
 ```bash
-# 1. Initialize
-secret-wallet init
-
-# 2. Add a key with biometric protection
-secret-wallet add openai-key --biometric --env-name OPENAI_API_KEY
-
-# 3. Run a command with injected credentials
-secret-wallet inject -- moltbot chat "Hello"
+# Find all .env files
+./scripts/migrate-env.sh --scan ~/projects
 ```
+
+### Preview (no changes)
+
+```bash
+./scripts/migrate-env.sh .env.local --dry-run --all
+```
+
+Output:
+```
+Found 7 secret(s) to import:
+  [DRY-RUN] Would import: DATABASE_URL
+  [DRY-RUN] Would import: SUPABASE_SERVICE_ROLE_KEY
+  [DRY-RUN] Would import: OPENAI_API_KEY
+  ...
+
+━━━ Migration Summary ━━━
+  Imported:        7
+  Public (skipped): 3    ← NEXT_PUBLIC_* are not secrets
+```
+
+### Import
+
+```bash
+# Interactive (confirm each key)
+./scripts/migrate-env.sh .env.local
+
+# Import all at once
+./scripts/migrate-env.sh .env.local --all
+```
+
+**What gets imported:**
+- API keys, tokens, passwords, database URLs
+- Anything that looks like a secret
+
+**What gets skipped automatically:**
+- `NEXT_PUBLIC_*` (public, not secrets)
+- URLs, ports, log levels (config, not secrets)
+- Keys that already exist in Secret Wallet (no duplicates)
+
+> **Your `.env` files are never modified or deleted.** After verifying the migration, you decide when to remove them.
+
+---
+
+## CLI Reference
 
 ### Commands
 
-| Command | Description | Biometric |
-|---------|-------------|-----------|
+| Command | Description | JSON Support |
+|---------|-------------|-------------|
 | `init` | Verify Keychain access | -- |
-| `add <name>` | Store a secret | Optional (`--biometric`) |
-| `get <name>` | Retrieve a secret | If enabled |
-| `list` | List all secrets | -- |
-| `remove <name>` | Delete a secret | If enabled |
-| `inject -- <cmd>` | Run command with secrets as env vars | If enabled |
+| `add <name>` | Store a secret | -- |
+| `get <name>` | Retrieve a secret | `--json` |
+| `list` | List all secrets (names only) | `--json` |
+| `remove <name>` | Delete a secret | -- |
+| `inject -- <cmd>` | Run command with secrets as env vars | -- |
+| `status` | System health check (JSON) | Always JSON |
 | `setup` | Install shell aliases | -- |
 
-### Process Isolation (inject)
+### Options
 
 ```bash
-secret-wallet inject -- moltbot chat "Hello"
+# Add with custom env var name
+secret-wallet add my-key --env-name CUSTOM_ENV_VAR
+
+# Add with TouchID protection (optional, not required)
+secret-wallet add production-db --biometric
+
+# Get as JSON (for scripting)
+secret-wallet get OPENAI_KEY --json
+# {"name":"OPENAI_KEY","value":"sk-proj-...","biometric":false}
+
+# List as JSON (for integrations)
+secret-wallet list --json
+# [{"name":"OPENAI_KEY","envName":"OPENAI_KEY","biometric":"false"}, ...]
+
+# System status (always JSON)
+secret-wallet status
+```
+
+### Process Isolation
+
+```bash
+secret-wallet inject -- node server.js
 ```
 
 What happens:
-1. Retrieves all secrets from Keychain (TouchID if needed)
-2. Sets env vars **only in the child process**
-3. Spawns `moltbot` with injected credentials
-4. Credentials destroyed when process exits
-5. Parent shell **never** sees the secrets
+1. All secrets retrieved from Keychain
+2. Environment variables set **only in the child process**
+3. `node server.js` runs with `process.env.OPENAI_KEY` etc.
+4. Process exits -- credentials destroyed
+5. Parent shell **never** has the secrets
+
+### Use in package.json
+
+```json
+{
+  "scripts": {
+    "dev": "secret-wallet inject -- next dev",
+    "build": "secret-wallet inject -- next build"
+  }
+}
+```
+
+Then `npm run dev` works exactly as before, but with no `.env` file on disk.
+
+---
+
+## GUI App
+
+A native SwiftUI app for managing keys without the terminal.
+
+### Features
+
+- **Dashboard** -- All keys as cards with service icons and colors
+- **Add Key** -- Three-step flow: select service, name, paste key
+- **Service Presets** -- OpenAI (green), Anthropic (orange), Google AI (blue), OpenRouter (purple)
+- **Copy** -- One-click copy with optional TouchID, auto-clears clipboard after 30 seconds
+- **Search** -- Filter keys (appears with 4+ keys)
+- **Shared Storage** -- GUI and CLI share the same Keychain and metadata
 
 ---
 
 ## Security Model
 
-Secret Wallet implements **Defense in Depth** with 7 layers:
+### Defense in Depth (7 layers)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -191,30 +253,59 @@ Secret Wallet implements **Defense in Depth** with 7 layers:
 ├─────────────────────────────────────────┤
 │  Layer 6: Runtime Injection             │  Just-in-time credential delivery
 ├─────────────────────────────────────────┤
-│  Layer 5: Biometric Authentication      │  TouchID / FaceID verification
+│  Layer 5: Biometric Authentication      │  TouchID / FaceID (optional)
 ├─────────────────────────────────────────┤
 │  Layer 4: Encrypted Storage             │  macOS Keychain (AES-256-GCM)
 ├─────────────────────────────────────────┤
 │  Layer 3: OS-Level Access Control       │  Keychain ACL enforcement
 ├─────────────────────────────────────────┤
-│  Layer 2: Secure Enclave (T2/M1/M2)    │  Hardware-backed encryption
+│  Layer 2: Secure Enclave               │  Hardware-backed encryption (T2/M1~M4)
 ├─────────────────────────────────────────┤
 │  Layer 1: Physical Device Security      │  FileVault full-disk encryption
 └─────────────────────────────────────────┘
 ```
 
+**Layers 1-4, 6-7 are always active.** Layer 5 (biometric) is opt-in per key.
+
+Even without TouchID, Secret Wallet provides 6 active security layers -- compared to `.env` files which have zero.
+
 ### Threat Mitigations
 
 | Threat | How Secret Wallet Protects You |
 |--------|-------------------------------|
-| Plaintext credential theft | Keys encrypted in Keychain, never in files |
-| Accidental git commit | No credentials in filesystem at all |
+| Plaintext credential theft | Keys encrypted in Keychain, never as files |
+| Accidental git commit | No credential files exist to commit |
+| Malicious npm package | Keychain ACL blocks unauthorized app access |
 | Process memory dump | Credentials isolated to child process only |
-| Unauthorized access | TouchID/FaceID required before retrieval |
+| Unauthorized access | TouchID/FaceID required (if enabled) |
 | Backup/sync exposure | Keychain items flagged device-only (no iCloud) |
-| Clipboard sniffing | Auto-clear after 30 seconds |
+| Clipboard sniffing | Auto-clear after 30 seconds (GUI) |
 
 For the full threat model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## Comparison
+
+| | `.env` files | 1Password CLI | Secret Wallet |
+|---|---|---|---|
+| **Price** | Free | $3/month | **Free** |
+| **Account required** | No | Yes (email + master password) | **No** |
+| **Setup time** | Create file | Install + sign in + vault setup | **`brew install`** |
+| **Encryption** | None | AES-256-GCM (cloud) | **AES-256-GCM (local Keychain)** |
+| **Hardware security** | None | None | **Secure Enclave** |
+| **Biometric** | No | App unlock only | **Per-key TouchID** |
+| **Process isolation** | No (`dotenv` loads globally) | Partial (`op run`) | **Full (child process only)** |
+| **Cross-platform** | Yes | Yes | macOS only |
+| **Team sharing** | Copy files | Vault sharing | Not supported |
+| **GUI** | No | Separate app | **Built-in** |
+| **`.env` migration** | -- | Manual | **`migrate-env.sh` tool** |
+| **AI agent plugin** | -- | OpenClaw skill | **OpenClaw plugin** |
+
+**Best for:**
+- `.env` files -- quick prototyping, cross-platform teams
+- 1Password CLI -- enterprise teams, multi-platform, audit compliance
+- **Secret Wallet** -- solo macOS developers who want zero-config hardware security
 
 ---
 
@@ -224,30 +315,39 @@ For the full threat model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```
 secret-wallet/
-├── Sources/secret-wallet/
-│   └── main.swift              # CLI tool (swift-argument-parser)
-├── App/
-│   ├── Package.swift           # GUI app build config
+├── Sources/
+│   ├── SecretWalletCore/            # Shared library (CLI + GUI)
+│   │   ├── KeychainManager.swift    # Keychain CRUD + biometric ACL
+│   │   ├── MetadataStore.swift      # JSON persistence (thread-safe)
+│   │   ├── BiometricService.swift   # TouchID/FaceID detection
+│   │   ├── SecretMetadata.swift     # Key metadata model (Codable)
+│   │   └── SecretWalletError.swift  # User-friendly error types
+│   └── secret-wallet/               # CLI tool
+│       ├── SecretWallet.swift       # @main entry, subcommand registry
+│       └── Commands/
+│           ├── AddCommand.swift     # secret-wallet add
+│           ├── GetCommand.swift     # secret-wallet get (--json)
+│           ├── ListCommand.swift    # secret-wallet list (--json)
+│           ├── RemoveCommand.swift  # secret-wallet remove
+│           ├── InjectCommand.swift  # secret-wallet inject
+│           ├── StatusCommand.swift  # secret-wallet status
+│           ├── InitCommand.swift    # secret-wallet init
+│           └── SetupCommand.swift   # secret-wallet setup
+├── App/                             # GUI app (separate Package.swift)
 │   └── SecretWalletApp/
 │       ├── SecretWalletApp.swift    # @main entry point
-│       ├── Views/
-│       │   ├── DashboardView.swift  # Main screen (key list, search)
-│       │   ├── AddKeyView.swift     # Add key flow (3 steps)
-│       │   └── KeyCardView.swift    # Key card component
-│       ├── Services/
-│       │   ├── KeychainManager.swift    # Keychain CRUD + biometric
-│       │   ├── MetadataStore.swift      # JSON persistence (thread-safe)
-│       │   └── BiometricService.swift   # TouchID/FaceID detection
-│       └── Models/
-│           ├── SecretMetadata.swift     # Key metadata (Codable)
-│           ├── SecretWalletError.swift  # User-friendly errors
-│           └── AIService.swift          # Service presets
+│       ├── Views/                   # SwiftUI views
+│       ├── Services/                # Keychain, Metadata, Biometric
+│       └── Models/                  # AIService presets
 ├── scripts/
-│   ├── setup-shell.sh          # Shell alias installer
-│   └── manual-test.sh          # Integration test suite (7 tests)
-├── Package.swift               # CLI build config
-└── ~/Library/Application Support/secret-wallet/
-    └── metadata.json           # Shared metadata (CLI + GUI)
+│   ├── migrate-env.sh              # .env bulk migration tool
+│   ├── setup-shell.sh              # Shell alias installer
+│   ├── manual-test.sh              # Integration test suite
+│   ├── build-dmg.sh                # DMG packager
+│   └── generate-icon.sh            # App icon generator
+├── docs/                            # Architecture documentation
+├── Package.swift                    # CLI + Core build config
+└── CHANGELOG.md
 ```
 
 ### Shared Storage
@@ -261,42 +361,38 @@ Both CLI and GUI use the same backend:
 
 Keys added in the GUI appear in `secret-wallet list`, and vice versa.
 
-### Metadata Schema
-
-```json
-[
-  {
-    "name": "openai-key",
-    "envName": "OPENAI_API_KEY",
-    "biometric": true,
-    "serviceName": "openai",
-    "createdAt": "2026-02-12T10:00:00Z"
-  }
-]
-```
-
 ---
 
 ## Use Cases
 
-### OpenClaw / Moltbot
+### Next.js / Node.js Project
 
 ```bash
-# Before: plaintext key in auth-profiles.json
+# Before: .env.local with 8 plaintext keys
 # After:
-secret-wallet add anthropic-key --biometric --env-name ANTHROPIC_API_KEY
+./scripts/migrate-env.sh .env.local --all
+secret-wallet inject -- npm run dev
+```
+
+### OpenClaw / AI Agents
+
+```bash
+secret-wallet add anthropic --env-name ANTHROPIC_API_KEY
 secret-wallet inject -- moltbot chat "Hello"
 ```
 
-### Multi-Agent Workflows
+Secret Wallet also has an [OpenClaw plugin](https://github.com/baekho-lim/openclaw/tree/main/extensions/secret-wallet) that lets AI agents access keys directly via tool calls.
+
+### Multi-Key Workflows
 
 ```bash
-secret-wallet add openai --biometric --env-name OPENAI_API_KEY
-secret-wallet add anthropic --biometric --env-name ANTHROPIC_API_KEY
+secret-wallet add openai --env-name OPENAI_API_KEY
+secret-wallet add anthropic --env-name ANTHROPIC_API_KEY
+secret-wallet add supabase --env-name SUPABASE_SERVICE_ROLE_KEY
 secret-wallet inject -- ./multi-agent-orchestrator.sh
 ```
 
-### Local CI/CD
+### Vercel / CI Deployment
 
 ```bash
 secret-wallet add vercel-token --env-name VERCEL_TOKEN
@@ -305,24 +401,47 @@ secret-wallet inject -- vercel deploy --prod
 
 ---
 
-## Comparison
-
-| Solution | Encrypted | Biometric | Process Isolation | GUI |
-|----------|-----------|-----------|-------------------|-----|
-| Plaintext `.env` | No | No | No | -- |
-| 1Password CLI | Yes | Yes | Partial | Separate app |
-| **Secret Wallet** | **Yes (Keychain)** | **Yes** | **Yes** | **Built-in** |
-
----
-
 ## Roadmap
 
 - [x] **v0.1.0**: CLI MVP (init, add, get, list, remove, inject)
 - [x] **v0.2.0**: Shell integration (aliases, tab completion, setup)
-- [x] **v0.3.0-alpha**: SwiftUI GUI app (macOS)
+- [x] **v0.3.0-alpha**: SwiftUI GUI app + JSON output + status command
 - [ ] **v0.3.0**: GUI polish + .dmg distribution
-- [ ] **v0.4.0**: Multi-profile support (dev/staging/prod)
-- [ ] **v0.5.0**: Windows support (Tauri + Credential Manager)
+- [ ] **v0.4.0**: `.env` migration CLI subcommand (`secret-wallet import .env`)
+- [ ] **v0.5.0**: Multi-profile support (dev/staging/prod namespaces)
+- [ ] **v0.6.0**: Secret rotation + expiry alerts
+- [ ] **v1.0.0**: Stable release
+
+---
+
+## FAQ
+
+**Q: Do I need TouchID for every `npm run dev`?**
+No. TouchID is **optional and per-key**. Keys added without `--biometric` work instantly without any prompt. Only use `--biometric` for high-security keys (production DB, payment API, etc.).
+
+**Q: Is it safe without TouchID?**
+Yes. Even without biometric, you still get 6 security layers: Keychain encryption, Secure Enclave, OS-level ACL, process isolation, runtime injection, and FileVault. `.env` files have zero of these.
+
+**Q: Can the GUI and CLI share keys?**
+Yes. Both use the same Keychain service (`com.secret-wallet`) and metadata file.
+
+**Q: How do I use this in `package.json`?**
+```json
+{ "scripts": { "dev": "secret-wallet inject -- next dev" } }
+```
+Then `npm run dev` works as usual -- no `.env` file needed.
+
+**Q: What about CI/CD (GitHub Actions, Vercel)?**
+Secret Wallet is for local development. In CI/CD, use the platform's built-in secret management (GitHub Secrets, Vercel Environment Variables). Your production and development secrets stay separate.
+
+**Q: Can I use this on Linux/Windows?**
+Not yet. macOS only. For cross-platform teams, consider 1Password CLI or platform-specific secret managers.
+
+**Q: What happens if I delete Secret Wallet?**
+Your keys remain in macOS Keychain. Reinstall Secret Wallet to access them again, or use macOS Keychain Access app to manage them directly.
+
+**Q: How is this different from 1Password?**
+1Password is a cloud-based password manager for teams ($3/month, account required). Secret Wallet is a free, local, zero-config tool specifically for developer API keys on macOS. They solve different problems -- Secret Wallet is for developers who don't want to pay for or set up a password manager just to secure their `.env` files.
 
 ---
 
@@ -331,12 +450,9 @@ secret-wallet inject -- vercel deploy --prod
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ```bash
-# CLI
 git clone https://github.com/baekho-lim/secret-wallet.git
-cd secret-wallet && swift build
-
-# GUI
-cd App && swift build
+cd secret-wallet && swift build    # CLI
+cd App && swift build              # GUI
 ```
 
 This project was built with [Claude Code](https://claude.com/claude-code). AI-assisted contributions are encouraged -- just note it in your PR.
@@ -346,25 +462,6 @@ This project was built with [Claude Code](https://claude.com/claude-code). AI-as
 ## License
 
 MIT License -- See [LICENSE](LICENSE) for details.
-
----
-
-## FAQ
-
-**Q: Can the GUI and CLI share keys?**
-Yes. Both use the same Keychain service (`com.secret-wallet`) and metadata file.
-
-**Q: What happens if TouchID fails?**
-The operation is cancelled. Your key stays safely in Keychain. Try again.
-
-**Q: Can I use this on Linux/Windows?**
-Not yet. macOS only for now. Windows support via Tauri is planned for v0.5.0.
-
-**Q: How do I migrate from `.env` files?**
-```bash
-secret-wallet add my-key --biometric --env-name API_KEY
-# Then delete the .env entry and use: secret-wallet inject -- your-app
-```
 
 ---
 

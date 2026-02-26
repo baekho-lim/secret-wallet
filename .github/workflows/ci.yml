@@ -18,6 +18,9 @@ jobs:
     - name: Display Swift version
       run: swift --version
 
+    - name: Validate README i18n sync
+      run: ./scripts/check-readme-i18n.sh
+
     - name: Build
       run: swift build -v
 
@@ -27,9 +30,9 @@ jobs:
           swift test -v
         else
           echo "⚠️  No test targets defined yet"
-          echo "Running manual integration test instead..."
-          chmod +x ./scripts/manual-test.sh
-          ./scripts/manual-test.sh
+          echo "Running integration suite instead..."
+          chmod +x ./scripts/test-full.sh
+          ./scripts/test-full.sh
         fi
 
     - name: Build release

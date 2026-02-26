@@ -24,8 +24,8 @@ jobs:
 
     - name: Run integration tests
       run: |
-        chmod +x ./scripts/manual-test.sh
-        ./scripts/manual-test.sh
+        chmod +x ./scripts/test-full.sh
+        ./scripts/test-full.sh --full
 
     - name: Verify version matches tag
       run: |

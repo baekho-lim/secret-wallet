@@ -98,6 +98,8 @@ Before submitting a PR, ensure:
 
 ### Documentation
 - [ ] Update README.md if adding features
+- [ ] If README.md changed, sync all translated README files
+- [ ] Run `./scripts/check-readme-i18n.sh`
 - [ ] Add inline comments for complex logic
 - [ ] Update CHANGELOG.md (if applicable)
 
@@ -132,6 +134,17 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) standard
 - `refactor`: Code refactoring (no behavior change)
 - `test`: Adding tests
 - `chore`: Build process, dependencies
+- `ci`: CI pipeline/workflow changes
+- `build`: Build system or packaging changes
+- `perf`: Performance improvements
+
+**Required rule**:
+- Use only the format above. Custom prefixes like `[~]`, `[^]`, `[+]` are not allowed.
+- Keep subject imperative and concise (`fix(inject): reduce auth prompts with --only`).
+
+**Validation**:
+- PR title and commit messages are validated in CI.
+- Non-conforming messages must be rewritten before merge.
 
 **Examples**:
 ```

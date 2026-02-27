@@ -178,6 +178,34 @@ Reduzierung:
 }
 ```
 
+## Testing
+
+Schneller CLI-Check (Standard für die meisten Änderungen):
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Swift-Smoke-Check (core + GUI build):
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+Vollständiger Integrationslauf:
+
+```bash
+./scripts/test-full.sh --full
+```
+
+Detaillierte Matrix / Release-Gates:
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- Vollrelease (`v*` Tags): CLI + GUI Artefakte
+- CLI-only Release (`cli-v*` Tags): nur CLI Artefakt
+
 ## GUI App
 
 Native SwiftUI-App für Secret-Management ohne Terminal.

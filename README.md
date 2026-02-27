@@ -262,6 +262,36 @@ Then `npm run dev` works exactly as before, but with no `.env` file on disk.
 
 ---
 
+## Testing
+
+Run fast CLI validation (recommended for most changes):
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Run Swift smoke validation (core + GUI build):
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+Run full integration suite:
+
+```bash
+./scripts/test-full.sh --full
+```
+
+Detailed matrix and release gating guidance:
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- Full release (`v*` tags): CLI + GUI artifacts
+- CLI-only release (`cli-v*` tags): CLI artifact only, faster ship path
+
+---
+
 ## GUI App
 
 A native SwiftUI app for managing keys without the terminal.

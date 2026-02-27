@@ -178,6 +178,34 @@ secret-wallet inject --only OPENAI_KEY -- node server.js
 }
 ```
 
+## Testing
+
+CLI 快速验证（大多数改动的默认路径）：
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Swift 冒烟验证（core + GUI build）：
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+完整集成验证：
+
+```bash
+./scripts/test-full.sh --full
+```
+
+详细测试矩阵/发布门禁：
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- 全量发布（`v*` 标签）：CLI + GUI 产物
+- CLI 专用发布（`cli-v*` 标签）：仅发布 CLI 产物
+
 ## GUI App
 
 提供基于 SwiftUI 的图形界面，便于非终端操作。

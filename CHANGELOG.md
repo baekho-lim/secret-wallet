@@ -22,11 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README.de.md`
 - i18n drift check script: `scripts/check-readme-i18n.sh`
 - i18n maintenance guide: `docs/README_I18N.md`
+- testing strategy guide: `docs/TESTING_STRATEGY.md`
+- fast test entrypoints:
+  - `scripts/test-cli-fast.sh`
+  - `scripts/test-swift-smoke.sh`
+- CLI-only release workflow for `cli-v*` tags (`.github/workflows/release-cli.yml`)
 
 ### Changed
 - `inject` pre-auth optimization now evaluates only selected target secrets instead of all stored secrets.
 - README examples now default to `--only` for lower prompt frequency.
 - CI/Release integration path uses `scripts/test-full.sh` as canonical suite.
+- README and multilingual READMEs now include testing/release-track guidance.
 
 ### Fixed
 - Integration test suite no longer hardcodes version strings in validation logic.

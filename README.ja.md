@@ -178,6 +178,34 @@ secret-wallet inject --only OPENAI_KEY -- node server.js
 }
 ```
 
+## Testing
+
+CLI の高速検証（通常変更の標準）:
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Swift スモーク検証（core + GUI build）:
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+フル統合検証:
+
+```bash
+./scripts/test-full.sh --full
+```
+
+詳細マトリクス/リリースゲート:
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- フルリリース（`v*` タグ）: CLI + GUI アーティファクト
+- CLI 専用リリース（`cli-v*` タグ）: CLI アーティファクトのみ
+
 ## GUI App
 
 SwiftUI ベースの GUI で端末なしでも秘密を管理できます。

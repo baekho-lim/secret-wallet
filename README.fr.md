@@ -178,6 +178,34 @@ Réduction des prompts:
 }
 ```
 
+## Testing
+
+Validation CLI rapide (par défaut pour la plupart des changements) :
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Validation smoke Swift (core + GUI build) :
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+Validation d'intégration complète :
+
+```bash
+./scripts/test-full.sh --full
+```
+
+Matrice détaillée / règles de release :
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- Release complète (`v*`) : artefacts CLI + GUI
+- Release CLI seule (`cli-v*`) : artefact CLI uniquement
+
 ## GUI App
 
 Application SwiftUI native pour gérer les secrets sans terminal.

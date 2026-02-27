@@ -182,6 +182,34 @@ secret-wallet inject --only OPENAI_KEY -- node server.js
 }
 ```
 
+## Testing
+
+빠른 CLI 검증(대부분의 변경 기본 경로):
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Swift 스모크 검증(core + GUI build):
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+전체 통합 검증:
+
+```bash
+./scripts/test-full.sh --full
+```
+
+상세 테스트 매트릭스/릴리스 게이트:
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- 전체 릴리스(`v*` 태그): CLI + GUI 아티팩트
+- CLI 전용 릴리스(`cli-v*` 태그): CLI 아티팩트만 배포
+
 ## GUI App
 
 터미널 없이 키를 관리할 수 있는 SwiftUI 기반 GUI 앱을 제공합니다.

@@ -1,0 +1,62 @@
+name: Release CLI Only
+
+on:
+  push:
+    tags: ["cli-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-cli:
+    name: Build and Release CLI
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Display Swift version
+        run: swift --version
+
+      - name: Run CLI fast gate
+        run: ./scripts/test-cli-fast.sh
+
+      - name: Verify version matches CLI tag
+        run: |
+          BINARY_VERSION=$(.build/release/secret-wallet --version)
+          TAG_VERSION=${GITHUB_REF_NAME#cli-v}
+          if [ "$BINARY_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: binary=$BINARY_VERSION tag=$TAG_VERSION"
+            exit 1
+          fi
+          echo "Version verified: $BINARY_VERSION"
+
+      - name: Create CLI archive
+        run: |
+          tar czf secret-wallet-arm64-darwin.tar.gz \
+            -C .build/release secret-wallet
+
+      - name: Generate CLI SHA256
+        run: |
+          shasum -a 256 secret-wallet-arm64-darwin.tar.gz | tee sha256.txt
+
+      - name: Create GitHub Release (CLI)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            secret-wallet-arm64-darwin.tar.gz
+            sha256.txt
+          generate_release_notes: true
+          body: |
+            ## CLI-only release
+
+            This tag publishes the CLI artifact only.
+
+            ### Install (manual)
+            ```bash
+            curl -L https://github.com/baekho-lim/secret-wallet/releases/download/${{ github.ref_name }}/secret-wallet-arm64-darwin.tar.gz | tar xz
+            sudo mv secret-wallet /usr/local/bin/
+            ```
+
+            Use `v*` tags for full releases that also include GUI DMG artifacts.

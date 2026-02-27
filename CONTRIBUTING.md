@@ -10,6 +10,8 @@ Thank you for your interest in contributing to Secret Wallet! This project aims 
 - **Issues**: [Bug Reports](https://github.com/baekho-lim/secret-wallet/issues/new?template=bug_report.md) | [Feature Requests](https://github.com/baekho-lim/secret-wallet/issues/new?template=feature_request.md)
 - **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
 - **Discussions**: [GitHub Discussions](https://github.com/baekho-lim/secret-wallet/discussions)
+- **PR Process**: [docs/PR_PRECHECK_PROCESS.md](docs/PR_PRECHECK_PROCESS.md)
+- **Recent PR Retro**: [docs/PR_RETRO_OPENCLAW_2026-02-27.md](docs/PR_RETRO_OPENCLAW_2026-02-27.md)
 
 ---
 
@@ -82,6 +84,10 @@ If you used AI assistance (Claude, ChatGPT, Copilot, etc.), please:
 ## 📋 Pull Request Checklist
 
 Before submitting a PR, ensure:
+
+### Preflight (Required)
+- [ ] Run `./scripts/pr-preflight.sh <cli|swift|full>` for your change scope
+- [ ] Optionally validate commit format locally: `./scripts/pr-preflight.sh cli --check-commit`
 
 ### Code Quality
 - [ ] Code builds successfully (`swift build`)

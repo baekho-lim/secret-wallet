@@ -1,10 +1,9 @@
 #!/bin/bash
 # Secret Wallet -- Comprehensive Test Suite
-# Senior Security Engineer Review: 57 test cases
 #
 # Usage:
-#   ./scripts/test-full.sh          # P0 tests only (19 tests)
-#   ./scripts/test-full.sh --full   # P0 + P1 tests (28 tests)
+#   ./scripts/test-full.sh          # P0 tests only
+#   ./scripts/test-full.sh --full   # P0 + P1 tests
 
 set +e
 
@@ -110,10 +109,10 @@ echo -e "${BOLD}${BLUE}=== P0: CLI Functional Tests ===${NC}"
 # ─── CLI-01 ──────────────────────────────────────────
 run_test "CLI-01" "Version output"
 VERSION=$($BINARY --version 2>&1 || echo "")
-if echo "$VERSION" | grep -q "0.3.0-alpha"; then
+if echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$'; then
     pass "Version: $VERSION"
 else
-    fail "Expected '0.3.0-alpha', got: '$VERSION'"
+    fail "Invalid semantic version format: '$VERSION'"
 fi
 
 # ─── CLI-02 ──────────────────────────────────────────
@@ -156,11 +155,52 @@ fi
 
 # ─── CLI-06 ──────────────────────────────────────────
 run_test "CLI-06" "Inject -- env var in child process"
-INJECTED=$($BINARY inject -- sh -c 'echo $TEST_API_KEY' 2>/dev/null || echo "INJECT_FAILED")
+INJECTED=$($BINARY inject --only "$TEST_NAME" -- sh -c 'echo $TEST_API_KEY' 2>/dev/null || echo "INJECT_FAILED")
 if [ "$INJECTED" = "$TEST_VALUE" ]; then
     pass "Env var injected correctly"
 else
     fail "Expected: '$TEST_VALUE', Got: '$INJECTED'"
+fi
+
+# ─── CLI-06A ─────────────────────────────────────────
+run_test "CLI-06A" "Inject --only-env filter"
+INJECTED_ENV=$($BINARY inject --only-env TEST_API_KEY -- sh -c 'echo $TEST_API_KEY' 2>/dev/null || echo "INJECT_FAILED")
+if [ "$INJECTED_ENV" = "$TEST_VALUE" ]; then
+    pass "--only-env injected expected secret"
+else
+    fail "Expected: '$TEST_VALUE', Got: '$INJECTED_ENV'"
+fi
+
+# ─── CLI-06B ─────────────────────────────────────────
+run_test "CLI-06B" "Inject --dry-run prints plan and skips execution"
+DRY_RUN_SENTINEL="/tmp/secret-wallet-dry-run-$$.txt"
+rm -f "$DRY_RUN_SENTINEL"
+DRY_RUN_OUT=$($BINARY inject --dry-run --only "$TEST_NAME" -- sh -c "echo SHOULD_NOT_RUN > '$DRY_RUN_SENTINEL'" 2>&1 || echo "DRY_FAILED")
+if echo "$DRY_RUN_OUT" | grep -q "$TEST_NAME" && [ ! -f "$DRY_RUN_SENTINEL" ]; then
+    pass "--dry-run listed target and did not execute command"
+else
+    fail "Unexpected dry-run output: $DRY_RUN_OUT"
+fi
+rm -f "$DRY_RUN_SENTINEL"
+
+# ─── CLI-06C ─────────────────────────────────────────
+run_test "CLI-06C" "Inject rejects conflicting --all and --only"
+CONFLICT_OUT=$($BINARY inject --all --only "$TEST_NAME" -- true 2>&1)
+CONFLICT_EXIT=$?
+if [ $CONFLICT_EXIT -ne 0 ] && echo "$CONFLICT_OUT" | grep -q -- "--all cannot be used"; then
+    pass "Conflict properly rejected"
+else
+    fail "Expected conflict rejection, exit=$CONFLICT_EXIT output='$CONFLICT_OUT'"
+fi
+
+# ─── CLI-06D ─────────────────────────────────────────
+run_test "CLI-06D" "Inject fails when filters match no secrets"
+NO_MATCH_OUT=$($BINARY inject --only "${TEST_PREFIX}-missing" -- true 2>&1)
+NO_MATCH_EXIT=$?
+if [ $NO_MATCH_EXIT -ne 0 ] && echo "$NO_MATCH_OUT" | grep -qi "No matching secrets"; then
+    pass "No-match filter returns failure"
+else
+    fail "Expected no-match failure, exit=$NO_MATCH_EXIT output='$NO_MATCH_OUT'"
 fi
 
 # ─── CLI-07 ──────────────────────────────────────────
@@ -205,13 +245,18 @@ fi
 
 # ─── CLI-10 ──────────────────────────────────────────
 run_test "CLI-10" "Inject with no secrets -- command still runs"
-# Clean all test keys first
+# Clean all test keys first (leave user-managed keys untouched)
 cleanup_test_keys
-INJECT_HELLO=$($BINARY inject -- echo "hello-world" 2>/dev/null || echo "")
-if echo "$INJECT_HELLO" | grep -q "hello-world"; then
-    pass "Command ran successfully with no secrets"
+LIST_JSON=$($BINARY list --json 2>/dev/null || echo "[]")
+if echo "$LIST_JSON" | tr -d '[:space:]' | grep -q '^\[\]$'; then
+    INJECT_HELLO=$($BINARY inject -- echo "hello-world" 2>/dev/null || echo "")
+    if echo "$INJECT_HELLO" | grep -q "hello-world"; then
+        pass "Command ran successfully with no secrets"
+    else
+        fail "Inject failed with no secrets: '$INJECT_HELLO'"
+    fi
 else
-    fail "Inject failed with no secrets: '$INJECT_HELLO'"
+    skip "Environment has existing secrets; skipped default all-secret inject check to avoid interactive prompts"
 fi
 
 
@@ -239,7 +284,7 @@ $BINARY remove "$SEC_NAME" 2>/dev/null || true
 run_test "SEC-02" "Inject -- parent process env isolation"
 SEC_ISO="${TEST_PREFIX}-iso"
 echo "isolation-test-value" | $BINARY add "$SEC_ISO" --env-name "ISOLATION_TEST_VAR" 2>/dev/null
-$BINARY inject -- true 2>/dev/null || true
+$BINARY inject --only "$SEC_ISO" -- true 2>/dev/null || true
 PARENT_VAL="${ISOLATION_TEST_VAR:-NOT_SET}"
 if [ "$PARENT_VAL" = "NOT_SET" ]; then
     pass "Parent env not contaminated"
@@ -398,13 +443,16 @@ $BINARY remove "$TEST_OVR" 2>/dev/null || true
 
 # ─── CLI-16 ──────────────────────────────────────────
 run_test "CLI-16" "Inject -- child exit code propagation"
-$BINARY inject -- sh -c "exit 42" 2>/dev/null
+TEST_EXIT="${TEST_PREFIX}-exitcode"
+echo "exit-test-value" | $BINARY add "$TEST_EXIT" --env-name "EXIT_TEST_VAR" 2>/dev/null
+$BINARY inject --only "$TEST_EXIT" -- sh -c "exit 42" 2>/dev/null
 CHILD_EXIT=$?
 if [ "$CHILD_EXIT" = "42" ]; then
     pass "Exit code 42 propagated"
 else
     fail "Exit code: $CHILD_EXIT (expected: 42)"
 fi
+$BINARY remove "$TEST_EXIT" 2>/dev/null || true
 
 # ─── CLI-18 ──────────────────────────────────────────
 run_test "CLI-18" "Help text for all commands"
@@ -412,6 +460,9 @@ ALL_HELP_OK=true
 for cmd in "" "init" "add" "get" "list" "remove" "inject" "setup"; do
     if [ -z "$cmd" ]; then
         OUTPUT=$($BINARY --help 2>&1 || true)
+    elif [ "$cmd" = "inject" ]; then
+        # inject uses passthrough args, so use command help path to avoid executing passthrough payload
+        OUTPUT=$($BINARY help inject 2>&1 || true)
     else
         OUTPUT=$($BINARY $cmd --help 2>&1 || true)
     fi

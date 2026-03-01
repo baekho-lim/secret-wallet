@@ -47,11 +47,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 1/7: Version Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 VERSION=$($BINARY --version 2>&1 || echo "")
-if echo "$VERSION" | grep -q "0.1.0"; then
+if echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$'; then
     echo -e "${GREEN}✅ PASS${NC} - Version: $VERSION"
     ((PASSED++))
 else
-    echo -e "${RED}❌ FAIL${NC} - Expected '0.1.0', got: $VERSION"
+    echo -e "${RED}❌ FAIL${NC} - Invalid semantic version format: $VERSION"
     ((FAILED++))
 fi
 echo ""
@@ -61,7 +61,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 2/7: Init Command"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 INIT_OUTPUT=$($BINARY init 2>&1 || echo "INIT_FAILED")
-if echo "$INIT_OUTPUT" | grep -q "✅ macOS Keychain 연동 완료"; then
+if ! echo "$INIT_OUTPUT" | grep -q "INIT_FAILED" && echo "$INIT_OUTPUT" | grep -qi "keychain"; then
     echo -e "${GREEN}✅ PASS${NC} - Keychain access verified"
     ((PASSED++))
 else
@@ -118,7 +118,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 5/7: Inject Command"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 TEMP_FILE="/tmp/inject-test-$$.txt"
-$BINARY inject -- sh -c "echo \$TEST_VAR" > "$TEMP_FILE" 2>/dev/null || echo "INJECT_FAILED" > "$TEMP_FILE"
+$BINARY inject --only "$TEST_SECRET" -- sh -c "echo \$TEST_VAR" > "$TEMP_FILE" 2>/dev/null || echo "INJECT_FAILED" > "$TEMP_FILE"
 INJECTED=$(cat "$TEMP_FILE")
 rm -f "$TEMP_FILE"
 

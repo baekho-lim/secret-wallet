@@ -10,10 +10,24 @@ Thank you for your interest in contributing to Secret Wallet! This project aims 
 - **Issues**: [Bug Reports](https://github.com/baekho-lim/secret-wallet/issues/new?template=bug_report.md) | [Feature Requests](https://github.com/baekho-lim/secret-wallet/issues/new?template=feature_request.md)
 - **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
 - **Discussions**: [GitHub Discussions](https://github.com/baekho-lim/secret-wallet/discussions)
+- **PR Process**: [docs/PR_PRECHECK_PROCESS.md](docs/PR_PRECHECK_PROCESS.md)
+- **Repo Lanes**: [docs/OPENCLAW_REPO_LANES.md](docs/OPENCLAW_REPO_LANES.md)
+- **Recent PR Retro**: [docs/PR_RETRO_OPENCLAW_2026-02-27.md](docs/PR_RETRO_OPENCLAW_2026-02-27.md)
 
 ---
 
 ## 🤝 How to Contribute
+
+### Repository Lanes (Fixed)
+
+Use this routing rule before writing code:
+
+- Secret Wallet CLI/Swift/docs: `baekho-lim/secret-wallet` repository
+- OpenClaw plugin package/release: `baekho-lim/openclaw-secret-wallet` repository
+- OpenClaw upstream PR prep: `baekho-lim/openclaw-fresh` fork repository
+
+Full policy and sync flow:
+- [docs/OPENCLAW_REPO_LANES.md](docs/OPENCLAW_REPO_LANES.md)
 
 ### 1. Found a Bug?
 
@@ -83,6 +97,10 @@ If you used AI assistance (Claude, ChatGPT, Copilot, etc.), please:
 
 Before submitting a PR, ensure:
 
+### Preflight (Required)
+- [ ] Run `./scripts/pr-preflight.sh <cli|swift|full>` for your change scope
+- [ ] Optionally validate commit format locally: `./scripts/pr-preflight.sh cli --check-commit`
+
 ### Code Quality
 - [ ] Code builds successfully (`swift build`)
 - [ ] All tests pass (`swift test`)
@@ -98,6 +116,8 @@ Before submitting a PR, ensure:
 
 ### Documentation
 - [ ] Update README.md if adding features
+- [ ] If README.md changed, sync all translated README files
+- [ ] Run `./scripts/check-readme-i18n.sh`
 - [ ] Add inline comments for complex logic
 - [ ] Update CHANGELOG.md (if applicable)
 
@@ -132,6 +152,17 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) standard
 - `refactor`: Code refactoring (no behavior change)
 - `test`: Adding tests
 - `chore`: Build process, dependencies
+- `ci`: CI pipeline/workflow changes
+- `build`: Build system or packaging changes
+- `perf`: Performance improvements
+
+**Required rule**:
+- Use only the format above. Custom prefixes like `[~]`, `[^]`, `[+]` are not allowed.
+- Keep subject imperative and concise (`fix(inject): reduce auth prompts with --only`).
+
+**Validation**:
+- PR title and commit messages are validated in CI.
+- Non-conforming messages must be rewritten before merge.
 
 **Examples**:
 ```
@@ -277,7 +308,7 @@ All contributions must adhere to:
 - [Swift Argument Parser](https://github.com/apple/swift-argument-parser)
 
 ### Related Projects
-- [OpenClaw](https://github.com/transitive-bullshit/OpenClaw) - Target integration platform
+- [OpenClaw](https://github.com/openclaw/openclaw) - Target integration platform
 - [Moltbot](https://github.com/pjgeorg/moltbot) - AI agent framework
 
 ---

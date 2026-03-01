@@ -6,12 +6,14 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%2013+-blue.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+Languages: **English** | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [Français](README.fr.md) | [Deutsch](README.de.md)
+
 Secret Wallet replaces plaintext `.env` files with macOS Keychain encryption. No account needed. No subscription. Just install and your API keys are hardware-encrypted.
 
 ```bash
 brew install baekho-lim/tap/secret-wallet
 secret-wallet add OPENAI_KEY
-secret-wallet inject -- npm run dev   # Keys injected, process exits, keys gone
+secret-wallet inject --only OPENAI_KEY -- npm run dev
 ```
 
 ---
@@ -76,11 +78,25 @@ source ~/.zshrc
 | `swg KEY` | `secret-wallet get KEY` | Get secret |
 | `swl` | `secret-wallet list` | List secrets |
 | `swr KEY` | `secret-wallet remove KEY` | Remove secret |
-| `swi cmd` | `secret-wallet inject -- cmd` | Inject & run |
+| `swi cmd` | `secret-wallet inject --only OPENAI_KEY -- cmd` | Inject & run |
 
 ---
 
 ## Quick Start
+
+If you want a 60-second developer sanity check first, run this exact flow:
+
+```bash
+secret-wallet add QUICKSTART_KEY
+secret-wallet inject --only QUICKSTART_KEY -- sh -lc 'printf "%s\n" "$QUICKSTART_KEY"'
+secret-wallet remove QUICKSTART_KEY
+```
+
+For inject command details, use:
+
+```bash
+secret-wallet help inject
+```
 
 ### 1. Add your first key
 
@@ -103,7 +119,7 @@ secret-wallet status
 
 ```bash
 # Run any command with keys injected as environment variables
-secret-wallet inject -- npm run dev
+secret-wallet inject --only OPENAI_KEY -- npm run dev
 
 # Your app reads process.env.OPENAI_KEY as usual
 # When the process exits, the keys are gone from memory
@@ -175,7 +191,7 @@ Found 7 secret(s) to import:
 | `get <name>` | Retrieve a secret | `--json` |
 | `list` | List all secrets (names only) | `--json` |
 | `remove <name>` | Delete a secret | -- |
-| `inject -- <cmd>` | Run command with secrets as env vars | -- |
+| `inject [filters] -- <cmd>` | Run command with selected secrets as env vars | -- |
 | `status` | System health check (JSON) | Always JSON |
 | `setup` | Install shell aliases | -- |
 
@@ -198,33 +214,95 @@ secret-wallet list --json
 
 # System status (always JSON)
 secret-wallet status
+
+# Inject only one secret (recommended for fewer auth prompts)
+secret-wallet inject --only OPENAI_KEY -- npm run dev
+
+# Inject by environment variable mapping
+secret-wallet inject --only-env OPENAI_API_KEY -- npm run dev
+
+# Explicitly inject everything (legacy/default behavior)
+secret-wallet inject --all -- npm run dev
+
+# Preview which secrets would be loaded (no Keychain access, no execution)
+secret-wallet inject --dry-run --only OPENAI_KEY -- npm run dev
 ```
 
 ### Process Isolation
 
 ```bash
-secret-wallet inject -- node server.js
+secret-wallet inject --only OPENAI_KEY -- node server.js
 ```
 
 What happens:
-1. All secrets retrieved from Keychain
+1. Selected secrets are retrieved from Keychain (default: all, or filtered by `--only` / `--only-env`)
 2. Environment variables set **only in the child process**
 3. `node server.js` runs with `process.env.OPENAI_KEY` etc.
 4. Process exits -- credentials destroyed
 5. Parent shell **never** has the secrets
+
+### Why repeated password prompts happen
+
+If you store many secrets and run `inject` repeatedly, macOS can prompt for approval/authentication many times.
+
+Common causes:
+1. Default `inject` loads all stored secrets
+2. Automation/tests call `inject` multiple times in a row
+3. Agent tools repeatedly call `get` / `inject`
+
+How to reduce prompts:
+1. Load only what you need: `secret-wallet inject --only OPENAI_KEY -- <cmd>`
+2. Use `--dry-run` first to verify scope before execution
+3. Reserve full injection (`--all` or no filters) for trusted workflows
+
+### Legacy compatibility mode (inject all)
+
+`secret-wallet inject -- <cmd>` and `secret-wallet inject --all -- <cmd>` still work for backward compatibility.
+
+Use this only for trusted workflows where loading every stored secret is intentional.
 
 ### Use in package.json
 
 ```json
 {
   "scripts": {
-    "dev": "secret-wallet inject -- next dev",
-    "build": "secret-wallet inject -- next build"
+    "dev": "secret-wallet inject --only OPENAI_KEY -- next dev",
+    "build": "secret-wallet inject --only OPENAI_KEY -- next build"
   }
 }
 ```
 
 Then `npm run dev` works exactly as before, but with no `.env` file on disk.
+
+---
+
+## Testing
+
+Run fast CLI validation (recommended for most changes):
+
+```bash
+./scripts/test-cli-fast.sh
+```
+
+Run Swift smoke validation (core + GUI build):
+
+```bash
+./scripts/test-swift-smoke.sh
+```
+
+Run full integration suite:
+
+```bash
+./scripts/test-full.sh --full
+```
+
+Detailed matrix and release gating guidance:
+- `docs/TESTING_STRATEGY.md`
+
+### Release tracks
+
+- Full release (`v*` tags): CLI + GUI artifacts
+- CLI-only release (`cli-v*` tags): CLI artifact only, faster ship path
 
 ---
 
@@ -371,17 +449,19 @@ Keys added in the GUI appear in `secret-wallet list`, and vice versa.
 # Before: .env.local with 8 plaintext keys
 # After:
 ./scripts/migrate-env.sh .env.local --all
-secret-wallet inject -- npm run dev
+secret-wallet inject --only OPENAI_KEY -- npm run dev
 ```
 
 ### OpenClaw / AI Agents
 
 ```bash
 secret-wallet add anthropic --env-name ANTHROPIC_API_KEY
-secret-wallet inject -- moltbot chat "Hello"
+secret-wallet inject --only anthropic -- moltbot chat "Hello"
 ```
 
-Secret Wallet also has an [OpenClaw plugin](https://github.com/baekho-lim/openclaw/tree/main/extensions/secret-wallet) that lets AI agents access keys directly via tool calls.
+Secret Wallet also has an OpenClaw plugin that lets AI agents access keys directly via tool calls:
+- Source package repo (publish lane): [baekho-lim/openclaw-secret-wallet](https://github.com/baekho-lim/openclaw-secret-wallet)
+- OpenClaw fork integration lane: [baekho-lim/openclaw-fresh/extensions/secret-wallet](https://github.com/baekho-lim/openclaw-fresh/tree/main/extensions/secret-wallet)
 
 ### Multi-Key Workflows
 
@@ -389,14 +469,14 @@ Secret Wallet also has an [OpenClaw plugin](https://github.com/baekho-lim/opencl
 secret-wallet add openai --env-name OPENAI_API_KEY
 secret-wallet add anthropic --env-name ANTHROPIC_API_KEY
 secret-wallet add supabase --env-name SUPABASE_SERVICE_ROLE_KEY
-secret-wallet inject -- ./multi-agent-orchestrator.sh
+secret-wallet inject --only openai --only anthropic --only supabase -- ./multi-agent-orchestrator.sh
 ```
 
 ### Vercel / CI Deployment
 
 ```bash
 secret-wallet add vercel-token --env-name VERCEL_TOKEN
-secret-wallet inject -- vercel deploy --prod
+secret-wallet inject --only vercel-token -- vercel deploy --prod
 ```
 
 ---
@@ -419,6 +499,9 @@ secret-wallet inject -- vercel deploy --prod
 **Q: Do I need TouchID for every `npm run dev`?**
 No. TouchID is **optional and per-key**. Keys added without `--biometric` work instantly without any prompt. Only use `--biometric` for high-security keys (production DB, payment API, etc.).
 
+**Q: Why do I get repeated password prompts?**
+Usually because `inject` is loading too many secrets or being called repeatedly by scripts/agents. Use filters (`--only`, `--only-env`) so each run touches only the required keys.
+
 **Q: Is it safe without TouchID?**
 Yes. Even without biometric, you still get 5 security layers: Keychain encryption (AES-256-GCM), OS-level ACL, process isolation, runtime injection, and FileVault. Biometric-protected keys additionally get Secure Enclave hardware backing. `.env` files have zero of these layers.
 
@@ -427,7 +510,7 @@ Yes. Both use the same Keychain service (`com.secret-wallet`) and metadata file.
 
 **Q: How do I use this in `package.json`?**
 ```json
-{ "scripts": { "dev": "secret-wallet inject -- next dev" } }
+{ "scripts": { "dev": "secret-wallet inject --only OPENAI_KEY -- next dev" } }
 ```
 Then `npm run dev` works as usual -- no `.env` file needed.
 

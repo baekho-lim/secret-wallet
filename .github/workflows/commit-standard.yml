@@ -1,0 +1,60 @@
+name: Commit Message Standard
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  conventional-commits:
+    name: Validate PR title and commit subjects
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Conventional Commit format
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # Allowed: type(scope): subject or type!: subject
+          CONVENTIONAL_RE='^(feat|fix|docs|refactor|test|chore|ci|build|perf)(\([a-z0-9._/-]+\))?(!)?: .+'
+          DISALLOWED_PREFIX_RE='^\[(~|\^|\+)\]'
+
+          validate_line() {
+            local label="$1"
+            local value="$2"
+
+            if [[ "$value" =~ $DISALLOWED_PREFIX_RE ]]; then
+              echo "❌ $label uses a disallowed custom prefix: $value"
+              return 1
+            fi
+
+            if [[ ! "$value" =~ $CONVENTIONAL_RE ]]; then
+              echo "❌ $label is not Conventional Commits compliant: $value"
+              return 1
+            fi
+          }
+
+          echo "Checking PR title..."
+          validate_line "PR title" "$PR_TITLE"
+
+          echo "Checking commit subjects..."
+          mapfile -t SUBJECTS < <(git log --format=%s "${BASE_SHA}..${HEAD_SHA}")
+          if [ "${#SUBJECTS[@]}" -eq 0 ]; then
+            echo "❌ No commits found in PR range."
+            exit 1
+          fi
+
+          for subject in "${SUBJECTS[@]}"; do
+            validate_line "Commit subject" "$subject"
+          done
+
+          echo "✅ PR title and commit subjects follow Conventional Commits."

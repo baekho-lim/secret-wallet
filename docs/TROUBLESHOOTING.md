@@ -109,6 +109,33 @@ SecItemDelete(deleteQuery as CFDictionary)
 
 ---
 
+## `inject` 실행 시 비밀번호/인증 프롬프트가 과도하게 반복됨
+
+**증상**: `secret-wallet inject` 실행 중 macOS 비밀번호(또는 Touch ID) 입력을 여러 번 요구함.
+
+**원인**:
+1. 기본 `inject`는 저장된 키를 모두 로드함
+2. 테스트/자동화가 `inject`를 연속 호출함
+3. 에이전트가 `get`/`inject`를 반복 호출함
+
+**해결**:
+```bash
+# 필요한 키만 로드 (권장)
+secret-wallet inject --only OPENAI_KEY -- npm run dev
+
+# env 이름 기준으로 로드
+secret-wallet inject --only-env OPENAI_API_KEY -- npm run dev
+
+# 실제 로드 대상 미리 확인 (Keychain 접근/실행 없음)
+secret-wallet inject --dry-run --only OPENAI_KEY -- npm run dev
+```
+
+**운영 팁**:
+- 자동화/CI 테스트에서는 전체 주입 대신 `--only`를 사용
+- 전체 주입이 꼭 필요할 때만 `--all` 또는 기본 동작 사용
+
+---
+
 ## 개발 키워드
 
 `Swift`, `SwiftUI`, `macOS`, `Keychain Services`, `Security.framework`,

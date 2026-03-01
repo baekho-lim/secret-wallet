@@ -84,6 +84,20 @@ source ~/.zshrc
 
 ## Quick Start
 
+If you want a 60-second developer sanity check first, run this exact flow:
+
+```bash
+secret-wallet add QUICKSTART_KEY
+secret-wallet inject --only QUICKSTART_KEY -- sh -lc 'printf "%s\n" "$QUICKSTART_KEY"'
+secret-wallet remove QUICKSTART_KEY
+```
+
+For inject command details, use:
+
+```bash
+secret-wallet help inject
+```
+
 ### 1. Add your first key
 
 ```bash

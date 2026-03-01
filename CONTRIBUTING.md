@@ -11,11 +11,23 @@ Thank you for your interest in contributing to Secret Wallet! This project aims 
 - **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
 - **Discussions**: [GitHub Discussions](https://github.com/baekho-lim/secret-wallet/discussions)
 - **PR Process**: [docs/PR_PRECHECK_PROCESS.md](docs/PR_PRECHECK_PROCESS.md)
+- **Repo Lanes**: [docs/OPENCLAW_REPO_LANES.md](docs/OPENCLAW_REPO_LANES.md)
 - **Recent PR Retro**: [docs/PR_RETRO_OPENCLAW_2026-02-27.md](docs/PR_RETRO_OPENCLAW_2026-02-27.md)
 
 ---
 
 ## 🤝 How to Contribute
+
+### Repository Lanes (Fixed)
+
+Use this routing rule before writing code:
+
+- Secret Wallet CLI/Swift/docs: `baekho-lim/secret-wallet` repository
+- OpenClaw plugin package/release: `baekho-lim/openclaw-secret-wallet` repository
+- OpenClaw upstream PR prep: `baekho-lim/openclaw-fresh` fork repository
+
+Full policy and sync flow:
+- [docs/OPENCLAW_REPO_LANES.md](docs/OPENCLAW_REPO_LANES.md)
 
 ### 1. Found a Bug?
 
@@ -296,7 +308,7 @@ All contributions must adhere to:
 - [Swift Argument Parser](https://github.com/apple/swift-argument-parser)
 
 ### Related Projects
-- [OpenClaw](https://github.com/transitive-bullshit/OpenClaw) - Target integration platform
+- [OpenClaw](https://github.com/openclaw/openclaw) - Target integration platform
 - [Moltbot](https://github.com/pjgeorg/moltbot) - AI agent framework
 
 ---

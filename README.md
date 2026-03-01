@@ -459,7 +459,9 @@ secret-wallet add anthropic --env-name ANTHROPIC_API_KEY
 secret-wallet inject --only anthropic -- moltbot chat "Hello"
 ```
 
-Secret Wallet also has an [OpenClaw plugin](https://github.com/baekho-lim/openclaw/tree/main/extensions/secret-wallet) that lets AI agents access keys directly via tool calls.
+Secret Wallet also has an OpenClaw plugin that lets AI agents access keys directly via tool calls:
+- Source package repo (publish lane): [baekho-lim/openclaw-secret-wallet](https://github.com/baekho-lim/openclaw-secret-wallet)
+- OpenClaw fork integration lane: [baekho-lim/openclaw-fresh/extensions/secret-wallet](https://github.com/baekho-lim/openclaw-fresh/tree/main/extensions/secret-wallet)
 
 ### Multi-Key Workflows
 

@@ -2,6 +2,23 @@
 
 Use this before opening any PR to reduce CI churn and review turnaround time.
 
+## 0) Choose The Correct Lane First
+
+Before coding, decide the target lane:
+
+1. Secret Wallet core lane
+   - repo: `baekho-lim/secret-wallet`
+   - scope: CLI/Swift/GUI/docs for Secret Wallet
+2. Plugin source package lane
+   - repo: `baekho-lim/openclaw-secret-wallet`
+   - scope: plugin package source, npm release
+3. OpenClaw fork PR lane
+   - repo: `baekho-lim/openclaw-fresh`
+   - scope: upstream PR-ready integration in monorepo
+
+Reference:
+- [docs/OPENCLAW_REPO_LANES.md](./OPENCLAW_REPO_LANES.md)
+
 ## 1) Start Clean From Upstream
 
 1. Sync upstream first.
@@ -57,6 +74,9 @@ pnpm vitest run --config vitest.unit.config.ts src/config/config.plugin-validati
    - root cause
    - fix
    - validation evidence
+4. Confirm lane routing:
+   - package changes are in package lane
+   - upstream integration diffs are in fork lane
 
 ## 6) CI Triage Quick Map
 
